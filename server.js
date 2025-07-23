@@ -5,308 +5,393 @@ const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
-const io = socketIo(server);
-
-// Serve static files
-app.use(express.static(path.join(__dirname, 'public')));
-
-// Game state
-const games = {};
-
-// Socket.io connection handling
-io.on('connection', (socket) => {
-  console.log('New client connected:', socket.id);
-
-  // Join a room with room code
-  socket.on('joinRoom', (data) => {
-    const roomCode = data.roomCode;
-    let game = games[roomCode];
-
-    if (!game) {
-      // Create new game room
-      games[roomCode] = {
-        id: roomCode,
-        players: [{ id: socket.id, walls: 10, position: { x: 4, y: 0 } }],
-        board: initializeBoard(),
-        currentTurn: 0,
-        status: 'waiting'
-      };
-
-      socket.join(roomCode);
-      socket.emit('roomJoined', { roomCode, playerId: 0 });
-      console.log(`Room created: ${roomCode} by ${socket.id}`);
-    } else if (game.players.length === 1) {
-      // Join existing room
-      game.players.push({
-        id: socket.id,
-        walls: 10,
-        position: { x: 4, y: 8 }
-      });
-
-      socket.join(roomCode);
-      socket.emit('roomJoined', { roomCode, playerId: 1 });
-
-      // Start the game
-      game.status = 'playing';
-      io.to(roomCode).emit('gameStarted', game);
-      console.log(`Player joined room: ${roomCode}`);
-    } else {
-      socket.emit('error', { message: 'Room is full' });
+const io = socketIo(server, {
+    cors: {
+        origin: "*",
+        methods: ["GET", "POST"]
     }
-  });
-
-  // Player moves
-  socket.on('movePawn', (data) => {
-    const { roomCode, playerId, position } = data;
-    const game = games[roomCode];
-
-    if (!game || game.status !== 'playing') return;
-    if (game.currentTurn !== playerId) return;
-
-    // Validate move
-    if (isValidMove(game, playerId, position)) {
-      game.players[playerId].position = position;
-
-      // Check win condition
-      if (checkWinCondition(game, playerId)) {
-        game.status = 'finished';
-        io.to(roomCode).emit('gameOver', { winner: playerId });
-      } else {
-        // Next player's turn
-        game.currentTurn = (game.currentTurn + 1) % game.players.length;
-        io.to(roomCode).emit('gameUpdated', game);
-      }
-    }
-  });
-
-  // Place wall
-  socket.on('placeWall', (data) => {
-    const { roomCode, playerId, wall } = data;
-    const game = games[roomCode];
-
-    if (!game || game.status !== 'playing') return;
-    if (game.currentTurn !== playerId) return;
-
-    // Validate wall placement
-    if (isValidWallPlacement(game, playerId, wall)) {
-      // Update walls on the board
-      placeWallOnBoard(game.board, wall);
-
-      // Decrease player's wall count
-      game.players[playerId].walls--;
-
-      // Next player's turn
-      game.currentTurn = (game.currentTurn + 1) % game.players.length;
-      io.to(roomCode).emit('gameUpdated', game);
-    }
-  });
-
-  // Handle disconnection
-  socket.on('disconnect', () => {
-    console.log('Client disconnected:', socket.id);
-
-    // Find and handle any games this player was in
-    for (const gameId in games) {
-      const game = games[gameId];
-      const playerIndex = game.players.findIndex(p => p.id === socket.id);
-
-      if (playerIndex !== -1) {
-        if (game.status === 'playing') {
-          game.status = 'abandoned';
-          io.to(gameId).emit('playerLeft', { playerId: playerIndex });
-        } else if (game.status === 'waiting') {
-          delete games[gameId];
-        }
-      }
-    }
-  });
 });
 
+// Serve static files
+app.use(express.static(path.join(__dirname)));
+
+// Serve index.html for root route
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+// Game state storage
+const games = {};
+
 // Helper functions
-function generateGameId() {
-  return Math.random().toString(36).substring(2, 8);
+function generateRoomCode() {
+    return Math.random().toString(36).substring(2, 8).toUpperCase();
 }
 
 function initializeBoard() {
-  // Create a 9x9 board with no walls
-  const board = {
-    cells: Array(9).fill().map(() => Array(9).fill(0)),
-    horizontalWalls: Array(8).fill().map(() => Array(9).fill(false)),
-    verticalWalls: Array(9).fill().map(() => Array(8).fill(false))
-  };
-  return board;
+    return {
+        horizontalWalls: Array(8).fill().map(() => Array(9).fill(false)),
+        verticalWalls: Array(9).fill().map(() => Array(8).fill(false))
+    };
 }
 
 function isValidMove(game, playerId, newPosition) {
-  const player = game.players[playerId];
-  const currentPos = player.position;
+    const player = game.players[playerId];
+    const currentPos = player.position;
 
-  // Check if move is within bounds
-  if (newPosition.x < 0 || newPosition.x > 8 || newPosition.y < 0 || newPosition.y > 8) {
+    // Check bounds
+    if (newPosition.x < 0 || newPosition.x > 8 || newPosition.y < 0 || newPosition.y > 8) {
+        return false;
+    }
+
+    // Check if target is occupied
+    const isOccupied = game.players.some(p => 
+        p.position.x === newPosition.x && p.position.y === newPosition.y
+    );
+    if (isOccupied) return false;
+
+    const dx = Math.abs(newPosition.x - currentPos.x);
+    const dy = Math.abs(newPosition.y - currentPos.y);
+
+    // Adjacent move
+    if ((dx === 1 && dy === 0) || (dx === 0 && dy === 1)) {
+        return !isWallBetween(game.board, currentPos, newPosition);
+    }
+
+    // Jump move
+    if ((dx === 2 && dy === 0) || (dx === 0 && dy === 2)) {
+        const midPoint = {
+            x: currentPos.x + (newPosition.x - currentPos.x) / 2,
+            y: currentPos.y + (newPosition.y - currentPos.y) / 2
+        };
+        
+        // Check if opponent is at midpoint
+        const opponentAtMid = game.players.some(p => 
+            p.position.x === midPoint.x && p.position.y === midPoint.y
+        );
+        if (!opponentAtMid) return false;
+        
+        return !isWallBetween(game.board, currentPos, midPoint) && 
+               !isWallBetween(game.board, midPoint, newPosition);
+    }
+
+    // Diagonal jump
+    if (dx === 1 && dy === 1) {
+        // Find adjacent opponent
+        const directions = [
+            { x: 0, y: 1 }, { x: 0, y: -1 }, { x: 1, y: 0 }, { x: -1, y: 0 }
+        ];
+        
+        let opponentPos = null;
+        for (let dir of directions) {
+            const checkPos = { x: currentPos.x + dir.x, y: currentPos.y + dir.y };
+            const opponent = game.players.find(p => 
+                p.position.x === checkPos.x && p.position.y === checkPos.y
+            );
+            if (opponent) {
+                opponentPos = checkPos;
+                break;
+            }
+        }
+        
+        if (!opponentPos) return false;
+        
+        // Check if straight jump is blocked
+        const straightJump = {
+            x: currentPos.x + (opponentPos.x - currentPos.x) * 2,
+            y: currentPos.y + (opponentPos.y - currentPos.y) * 2
+        };
+        
+        if (straightJump.x >= 0 && straightJump.x <= 8 && 
+            straightJump.y >= 0 && straightJump.y <= 8) {
+            const straightBlocked = game.players.some(p => 
+                p.position.x === straightJump.x && p.position.y === straightJump.y
+            ) || isWallBetween(game.board, opponentPos, straightJump);
+            
+            if (!straightBlocked) return false; // Must use straight jump if available
+        }
+        
+        return !isWallBetween(game.board, currentPos, opponentPos) && 
+               !isWallBetween(game.board, opponentPos, newPosition);
+    }
+
     return false;
-  }
-
-  // Check if it's a valid adjacent move
-  const isAdjacent = (
-    (Math.abs(newPosition.x - currentPos.x) === 1 && newPosition.y === currentPos.y) ||
-    (Math.abs(newPosition.y - currentPos.y) === 1 && newPosition.x === currentPos.x)
-  );
-
-  if (!isAdjacent) {
-    // Check if it's a valid jump move
-    const isJump = checkJumpMove(game, currentPos, newPosition);
-    if (!isJump) return false;
-  }
-
-  // Check if there's a wall blocking the move
-  if (isWallBetween(game.board, currentPos, newPosition)) {
-    return false;
-  }
-
-  return true;
-}
-
-function checkJumpMove(game, currentPos, newPosition) {
-  // Find if there's an opponent between current position and new position
-  const opponentPos = game.players.find(p =>
-    p.position.x === (currentPos.x + newPosition.x) / 2 &&
-    p.position.y === (currentPos.y + newPosition.y) / 2
-  )?.position;
-
-  if (!opponentPos) return false;
-
-  // Check if the jump is valid (2 squares in same direction)
-  const isValidJump = (
-    (Math.abs(newPosition.x - currentPos.x) === 2 && newPosition.y === currentPos.y) ||
-    (Math.abs(newPosition.y - currentPos.y) === 2 && newPosition.x === currentPos.x)
-  );
-
-  return isValidJump && !isWallBetween(game.board, currentPos, opponentPos) &&
-    !isWallBetween(game.board, opponentPos, newPosition);
-}
-
-function isWallBetween(board, pos1, pos2) {
-  // Check horizontal walls
-  if (pos1.y === pos2.y && Math.abs(pos1.x - pos2.x) === 1) {
-    const minX = Math.min(pos1.x, pos2.x);
-    return board.verticalWalls[minX][pos1.y];
-  }
-
-  // Check vertical walls
-  if (pos1.x === pos2.x && Math.abs(pos1.y - pos2.y) === 1) {
-    const minY = Math.min(pos1.y, pos2.y);
-    return board.horizontalWalls[pos1.x][minY];
-  }
-
-  return false;
 }
 
 function isValidWallPlacement(game, playerId, wall) {
-  const player = game.players[playerId];
+    const player = game.players[playerId];
+    if (player.walls <= 0) return false;
 
-  // Check if player has walls left
-  if (player.walls <= 0) return false;
+    const { x, y, orientation } = wall;
 
-  const { x, y, orientation } = wall;
-
-  // Check if wall is within bounds
-  if (orientation === 'horizontal') {
-    if (x < 0 || x > 7 || y < 0 || y > 8) return false;
-
-    // Check if wall overlaps with existing walls
-    if (game.board.horizontalWalls[x][y] || game.board.horizontalWalls[x + 1][y]) return false;
-
-    // Check for intersecting walls
-    if (y > 0 && y < 8 && game.board.verticalWalls[x][y - 1] && game.board.verticalWalls[x][y]) return false;
-  } else { // vertical
-    if (x < 0 || x > 8 || y < 0 || y > 7) return false;
-
-    // Check if wall overlaps with existing walls
-    if (game.board.verticalWalls[x][y] || game.board.verticalWalls[x][y + 1]) return false;
-
-    // Check for intersecting walls
-    if (x > 0 && x < 8 && game.board.horizontalWalls[x - 1][y] && game.board.horizontalWalls[x][y]) return false;
-  }
-
-  // Check if wall placement blocks all paths to goal
-  const tempBoard = JSON.parse(JSON.stringify(game.board));
-  placeWallOnBoard(tempBoard, wall);
-
-  for (let i = 0; i < game.players.length; i++) {
-    if (!hasPathToGoal(tempBoard, game.players[i].position, i)) {
-      return false;
+    // Check bounds
+    if (orientation === 'horizontal') {
+        if (x < 0 || x > 7 || y < 1 || y > 8) return false;
+        if (game.board.horizontalWalls[x][y] || game.board.horizontalWalls[x + 1][y]) return false;
+    } else {
+        if (x < 1 || x > 8 || y < 0 || y > 7) return false;
+        if (game.board.verticalWalls[x][y] || game.board.verticalWalls[x][y + 1]) return false;
     }
-  }
 
-  return true;
+    // Check intersections
+    if (orientation === 'horizontal' && y > 0 && y < 8) {
+        if (game.board.verticalWalls[x + 1][y - 1] && game.board.verticalWalls[x + 1][y]) return false;
+    } else if (orientation === 'vertical' && x > 0 && x < 8) {
+        if (game.board.horizontalWalls[x - 1][y + 1] && game.board.horizontalWalls[x][y + 1]) return false;
+    }
+
+    // Check if wall blocks all paths
+    const tempBoard = JSON.parse(JSON.stringify(game.board));
+    placeWallOnBoard(tempBoard, wall);
+    
+    for (let player of game.players) {
+        if (!hasPathToGoal(tempBoard, player.position, player.id)) {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 function placeWallOnBoard(board, wall) {
-  const { x, y, orientation } = wall;
+    const { x, y, orientation } = wall;
+    
+    if (orientation === 'horizontal') {
+        board.horizontalWalls[x][y] = true;
+        board.horizontalWalls[x + 1][y] = true;
+    } else {
+        board.verticalWalls[x][y] = true;
+        board.verticalWalls[x][y + 1] = true;
+    }
+}
 
-  if (orientation === 'horizontal') {
-    board.horizontalWalls[x][y] = true;
-    board.horizontalWalls[x + 1][y] = true;
-  } else { // vertical
-    board.verticalWalls[x][y] = true;
-    board.verticalWalls[x][y + 1] = true;
-  }
+function isWallBetween(board, pos1, pos2) {
+    if (pos1.x === pos2.x) {
+        // Vertical movement
+        const x = pos1.x;
+        const minY = Math.min(pos1.y, pos2.y);
+        return board.horizontalWalls[x] && board.horizontalWalls[x][minY + 1];
+    } else if (pos1.y === pos2.y) {
+        // Horizontal movement
+        const y = pos1.y;
+        const minX = Math.min(pos1.x, pos2.x);
+        return board.verticalWalls[minX + 1] && board.verticalWalls[minX + 1][y];
+    }
+    return false;
 }
 
 function hasPathToGoal(board, position, playerId) {
-  // Use BFS to check if there's a path to the goal
-  const visited = Array(9).fill().map(() => Array(9).fill(false));
-  const queue = [position];
-  visited[position.x][position.y] = true;
+    const visited = Array(9).fill().map(() => Array(9).fill(false));
+    const queue = [position];
+    visited[position.x][position.y] = true;
 
-  const goalY = playerId === 0 ? 8 : 0;
+    const goalY = playerId === 0 ? 8 : 0;
 
-  while (queue.length > 0) {
-    const pos = queue.shift();
+    while (queue.length > 0) {
+        const pos = queue.shift();
 
-    // Check if reached goal
-    if (pos.y === goalY) return true;
+        if (pos.y === goalY) return true;
 
-    // Try all four directions
-    const directions = [
-      { x: 0, y: 1 }, // down
-      { x: 0, y: -1 }, // up
-      { x: 1, y: 0 }, // right
-      { x: -1, y: 0 } // left
-    ];
+        const directions = [
+            { x: 0, y: 1 }, { x: 0, y: -1 },
+            { x: 1, y: 0 }, { x: -1, y: 0 }
+        ];
 
-    for (const dir of directions) {
-      const newPos = { x: pos.x + dir.x, y: pos.y + dir.y };
+        for (const dir of directions) {
+            const newPos = { x: pos.x + dir.x, y: pos.y + dir.y };
 
-      // Check if new position is valid
-      if (newPos.x < 0 || newPos.x > 8 || newPos.y < 0 || newPos.y > 8) continue;
-      if (visited[newPos.x][newPos.y]) continue;
+            if (newPos.x < 0 || newPos.x > 8 || newPos.y < 0 || newPos.y > 8) continue;
+            if (visited[newPos.x][newPos.y]) continue;
+            if (isWallBetween(board, pos, newPos)) continue;
 
-      // Check if there's a wall blocking
-      if (isWallBetween(board, pos, newPos)) continue;
-
-      visited[newPos.x][newPos.y] = true;
-      queue.push(newPos);
+            visited[newPos.x][newPos.y] = true;
+            queue.push(newPos);
+        }
     }
-  }
 
-  return false;
+    return false;
 }
 
 function checkWinCondition(game, playerId) {
-  const player = game.players[playerId];
-
-  // Player 0 wins by reaching the bottom row
-  if (playerId === 0 && player.position.y === 8) return true;
-
-  // Player 1 wins by reaching the top row
-  if (playerId === 1 && player.position.y === 0) return true;
-
-  return false;
+    const player = game.players[playerId];
+    return (playerId === 0 && player.position.y === 8) || 
+           (playerId === 1 && player.position.y === 0);
 }
 
-// Start the server
+// Socket.io connection handling
+io.on('connection', (socket) => {
+    console.log('New client connected:', socket.id);
+
+    socket.on('joinRoom', (data) => {
+        let roomCode = data.roomCode;
+        
+        // If no room code provided, generate one
+        if (!roomCode) {
+            roomCode = generateRoomCode();
+        }
+        
+        let game = games[roomCode];
+
+        if (!game) {
+            // Create new game
+            games[roomCode] = {
+                id: roomCode,
+                players: [{
+                    id: socket.id,
+                    name: data.playerName || 'Player 1',
+                    position: { x: 4, y: 0 },
+                    walls: 10
+                }],
+                board: initializeBoard(),
+                currentTurn: 0,
+                status: 'waiting'
+            };
+
+            socket.join(roomCode);
+            socket.emit('roomJoined', { roomCode, playerId: 0 });
+            console.log(`Room created: ${roomCode} by ${socket.id}`);
+        } else if (game.players.length === 1 && game.status === 'waiting') {
+            // Join existing room
+            game.players.push({
+                id: socket.id,
+                name: data.playerName || 'Player 2',
+                position: { x: 4, y: 8 },
+                walls: 10
+            });
+
+            socket.join(roomCode);
+            socket.emit('roomJoined', { roomCode, playerId: 1 });
+
+            // Start the game
+            game.status = 'playing';
+            io.to(roomCode).emit('gameStarted', {
+                players: game.players.map(p => ({ name: p.name, position: p.position, walls: p.walls })),
+                board: game.board,
+                currentTurn: game.currentTurn
+            });
+            console.log(`Player joined room: ${roomCode}, game started`);
+        } else {
+            socket.emit('error', { message: 'Room is full or game in progress' });
+        }
+    });
+
+    socket.on('movePawn', (data) => {
+        const { roomCode, playerId, position } = data;
+        const game = games[roomCode];
+
+        if (!game || game.status !== 'playing') {
+            socket.emit('error', { message: 'Game not found or not in progress' });
+            return;
+        }
+
+        if (game.currentTurn !== playerId) {
+            socket.emit('error', { message: 'Not your turn' });
+            return;
+        }
+
+        if (!isValidMove(game, playerId, position)) {
+            socket.emit('error', { message: 'Invalid move' });
+            return;
+        }
+
+        // Execute move
+        game.players[playerId].position = position;
+
+        // Check win condition
+        if (checkWinCondition(game, playerId)) {
+            game.status = 'finished';
+            io.to(roomCode).emit('gameOver', { winner: playerId });
+            console.log(`Game ${roomCode} finished, winner: ${playerId}`);
+        } else {
+            // Next turn
+            game.currentTurn = (game.currentTurn + 1) % 2;
+            io.to(roomCode).emit('gameUpdated', {
+                players: game.players.map(p => ({ position: p.position, walls: p.walls })),
+                board: game.board,
+                currentTurn: game.currentTurn
+            });
+        }
+    });
+
+    socket.on('placeWall', (data) => {
+        const { roomCode, playerId, wall } = data;
+        const game = games[roomCode];
+
+        if (!game || game.status !== 'playing') {
+            socket.emit('error', { message: 'Game not found or not in progress' });
+            return;
+        }
+
+        if (game.currentTurn !== playerId) {
+            socket.emit('error', { message: 'Not your turn' });
+            return;
+        }
+
+        if (!isValidWallPlacement(game, playerId, wall)) {
+            socket.emit('error', { message: 'Invalid wall placement' });
+            return;
+        }
+
+        // Place wall
+        placeWallOnBoard(game.board, wall);
+        game.players[playerId].walls--;
+
+        // Next turn
+        game.currentTurn = (game.currentTurn + 1) % 2;
+        io.to(roomCode).emit('gameUpdated', {
+            players: game.players.map(p => ({ position: p.position, walls: p.walls })),
+            board: game.board,
+            currentTurn: game.currentTurn
+        });
+    });
+
+    socket.on('disconnect', () => {
+        console.log('Client disconnected:', socket.id);
+
+        // Handle game cleanup
+        for (const roomCode in games) {
+            const game = games[roomCode];
+            const playerIndex = game.players.findIndex(p => p.id === socket.id);
+
+            if (playerIndex !== -1) {
+                if (game.status === 'playing') {
+                    // Notify other player
+                    socket.to(roomCode).emit('playerLeft', { playerId: playerIndex });
+                    game.status = 'abandoned';
+                } else if (game.status === 'waiting') {
+                    // Remove waiting game
+                    delete games[roomCode];
+                }
+                break;
+            }
+        }
+    });
+});
+
+// Clean up abandoned games periodically
+setInterval(() => {
+    const now = Date.now();
+    for (const roomCode in games) {
+        const game = games[roomCode];
+        if (game.status === 'abandoned' || 
+            (game.status === 'waiting' && now - game.createdAt > 300000)) { // 5 minutes
+            delete games[roomCode];
+            console.log(`Cleaned up game: ${roomCode}`);
+        }
+    }
+}, 60000); // Check every minute
+
+// Add creation timestamp to games
+const originalGames = games;
+Object.defineProperty(games, 'roomCode', {
+    set: function(game) {
+        game.createdAt = Date.now();
+        originalGames[game.id] = game;
+    }
+});
+
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+    console.log(`Quoridor server running on port ${PORT}`);
+    console.log(`Server URL: https://wall-chess.onrender.com`);
 });

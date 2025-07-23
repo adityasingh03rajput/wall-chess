@@ -5,42 +5,633 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Quoridor - Wall Chess Master</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css">
+    <style>
+        :root {
+            --primary-color: #6366f1;
+            --secondary-color: #8b5cf6;
+            --accent-color: #06d6a0;
+            --danger-color: #ef4444;
+            --warning-color: #f59e0b;
+            --success-color: #10b981;
+            
+            --bg-primary: #0f0f23;
+            --bg-secondary: #1a1a2e;
+            --bg-tertiary: #16213e;
+            
+            --text-primary: #ffffff;
+            --text-secondary: #a1a1aa;
+            --text-muted: #71717a;
+            
+            --glass-bg: rgba(255, 255, 255, 0.1);
+            --glass-border: rgba(255, 255, 255, 0.2);
+            
+            --border-radius: 12px;
+            --cell-size: 60px;
+            --wall-thickness: 8px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: var(--text-primary);
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+
+        .screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease-in-out;
+            z-index: 1;
+        }
+
+        .screen.active {
+            opacity: 1;
+            visibility: visible;
+            z-index: 10;
+        }
+
+        .menu-container {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--border-radius);
+            padding: 3rem;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            max-width: 600px;
+            width: 90%;
+        }
+
+        .game-title {
+            margin-bottom: 2rem;
+        }
+
+        .title-main {
+            display: block;
+            font-size: 4rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+        }
+
+        .title-sub {
+            display: block;
+            font-size: 1.2rem;
+            font-weight: 300;
+            color: var(--text-secondary);
+            letter-spacing: 0.1em;
+        }
+
+        .menu-options {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .menu-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+            padding: 1rem 2rem;
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--border-radius);
+            color: var(--text-primary);
+            font-size: 1.1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            backdrop-filter: blur(10px);
+            text-decoration: none;
+        }
+
+        .menu-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .menu-btn.primary {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            border: none;
+            color: white;
+        }
+
+        .menu-btn.primary:hover {
+            background: linear-gradient(135deg, #5855eb, #7c3aed);
+            box-shadow: 0 10px 25px rgba(99, 102, 241, 0.4);
+        }
+
+        .game-modes {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .mode-card {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--border-radius);
+            padding: 2rem;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            backdrop-filter: blur(10px);
+            text-align: center;
+        }
+
+        .mode-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .mode-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .mode-card h3 {
+            font-size: 1.3rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: var(--text-primary);
+        }
+
+        .mode-card p {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .back-btn {
+            background: transparent;
+            border: 1px solid var(--glass-border);
+            color: var(--text-secondary);
+            padding: 0.75rem 1.5rem;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            transition: all 0.15s ease;
+            font-size: 1rem;
+        }
+
+        .back-btn:hover {
+            background: var(--glass-bg);
+            color: var(--text-primary);
+            transform: translateX(-2px);
+        }
+
+        .screen-title {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 2rem;
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        #gameScreen {
+            flex-direction: column;
+            padding: 1rem;
+            align-items: stretch;
+            justify-content: flex-start;
+        }
+
+        .game-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--border-radius);
+            padding: 1rem 2rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .game-info {
+            display: flex;
+            align-items: center;
+            gap: 2rem;
+            flex: 1;
+        }
+
+        .player-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .player-avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            border: 3px solid;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            font-weight: bold;
+            position: relative;
+        }
+
+        .player-avatar.p1 {
+            background: linear-gradient(135deg, var(--danger-color), #dc2626);
+            border-color: var(--danger-color);
+            color: white;
+        }
+
+        .player-avatar.p2 {
+            background: linear-gradient(135deg, var(--success-color), #059669);
+            border-color: var(--success-color);
+            color: white;
+        }
+
+        .player-avatar.active::after {
+            content: '';
+            position: absolute;
+            top: -5px;
+            left: -5px;
+            right: -5px;
+            bottom: -5px;
+            border: 2px solid var(--accent-color);
+            border-radius: 50%;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.05); opacity: 0.7; }
+        }
+
+        .player-details {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+
+        .player-name {
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+
+        .walls-count {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .game-status {
+            text-align: center;
+            flex: 1;
+        }
+
+        .turn-indicator {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: var(--accent-color);
+        }
+
+        .game-timer {
+            font-size: 1rem;
+            color: var(--text-secondary);
+            font-family: 'Courier New', monospace;
+        }
+
+        .game-controls {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .control-btn {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1rem;
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--border-radius);
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            backdrop-filter: blur(10px);
+        }
+
+        .control-btn:hover:not(:disabled) {
+            background: rgba(255, 255, 255, 0.15);
+            transform: translateY(-1px);
+        }
+
+        .control-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .control-btn.active {
+            background: var(--primary-color);
+            border-color: var(--primary-color);
+            color: white;
+        }
+
+        .game-board-container {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 1rem;
+        }
+
+        .board-wrapper {
+            position: relative;
+            background: var(--bg-secondary);
+            border-radius: var(--border-radius);
+            padding: 2rem;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+            border: 1px solid var(--glass-border);
+        }
+
+        .game-board {
+            display: grid;
+            grid-template-columns: repeat(9, var(--cell-size));
+            grid-template-rows: repeat(9, var(--cell-size));
+            gap: 4px;
+            position: relative;
+            z-index: 2;
+        }
+
+        .cell {
+            background: linear-gradient(135deg, #f8fafc, #e2e8f0);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid transparent;
+        }
+
+        .cell:hover {
+            background: linear-gradient(135deg, #ddd6fe, #c4b5fd);
+            transform: scale(1.05);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .cell.valid-move {
+            background: linear-gradient(135deg, #dcfce7, #bbf7d0);
+            border-color: var(--success-color);
+            animation: validMovePulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes validMovePulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
+            50% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+        }
+
+        .pawn {
+            width: 80%;
+            height: 80%;
+            border-radius: 50%;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            border: 3px solid white;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: white;
+        }
+
+        .pawn.p1 {
+            background: linear-gradient(135deg, var(--danger-color), #dc2626);
+        }
+
+        .pawn.p2 {
+            background: linear-gradient(135deg, var(--success-color), #059669);
+        }
+
+        .walls-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .wall {
+            position: absolute;
+            background: linear-gradient(135deg, var(--secondary-color), #7c3aed);
+            border-radius: 4px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            transition: all 0.15s ease;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .wall.horizontal {
+            height: var(--wall-thickness);
+            width: calc(var(--cell-size) * 2 + 4px);
+        }
+
+        .wall.vertical {
+            width: var(--wall-thickness);
+            height: calc(var(--cell-size) * 2 + 4px);
+        }
+
+        .wall.preview {
+            opacity: 0.6;
+            pointer-events: auto;
+            cursor: pointer;
+            animation: wallPreview 1.5s ease-in-out infinite;
+        }
+
+        @keyframes wallPreview {
+            0%, 100% { box-shadow: 0 0 10px rgba(139, 92, 246, 0.5); }
+            50% { box-shadow: 0 0 20px rgba(139, 92, 246, 0.8); }
+        }
+
+        .online-options {
+            margin-bottom: 2rem;
+        }
+
+        .input-group {
+            margin-bottom: 1.5rem;
+            text-align: left;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 1rem;
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--border-radius);
+            color: var(--text-primary);
+            font-size: 1rem;
+            backdrop-filter: blur(10px);
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+        }
+
+        .online-buttons {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .online-buttons .menu-btn {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .toast {
+            position: fixed;
+            top: 2rem;
+            right: 2rem;
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--border-radius);
+            padding: 1rem 1.5rem;
+            color: var(--text-primary);
+            font-weight: 500;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            transform: translateX(400px);
+            transition: all 0.3s ease;
+            z-index: 2000;
+            max-width: 300px;
+        }
+
+        .toast.show {
+            transform: translateX(0);
+        }
+
+        .toast.success {
+            border-left: 4px solid var(--success-color);
+        }
+
+        .toast.error {
+            border-left: 4px solid var(--danger-color);
+        }
+
+        .toast.info {
+            border-left: 4px solid var(--primary-color);
+        }
+
+        .connection-status {
+            position: fixed;
+            top: 1rem;
+            left: 1rem;
+            padding: 0.5rem 1rem;
+            border-radius: var(--border-radius);
+            font-size: 0.9rem;
+            font-weight: 500;
+            z-index: 1000;
+        }
+
+        .connection-status.connected {
+            background: var(--success-color);
+            color: white;
+        }
+
+        .connection-status.disconnected {
+            background: var(--danger-color);
+            color: white;
+        }
+
+        @media (max-width: 768px) {
+            :root {
+                --cell-size: 45px;
+                --wall-thickness: 6px;
+            }
+            
+            .menu-container {
+                padding: 2rem;
+                margin: 1rem;
+            }
+            
+            .title-main {
+                font-size: 3rem;
+            }
+            
+            .game-modes {
+                grid-template-columns: 1fr;
+            }
+            
+            .board-wrapper {
+                padding: 1rem;
+            }
+            
+            .game-controls {
+                gap: 0.25rem;
+            }
+            
+            .control-btn {
+                padding: 0.5rem 0.75rem;
+                font-size: 0.8rem;
+            }
+        }
+    </style>
 </head>
 <body>
-    <!-- Particle Background -->
-    <div id="particles"></div>
-    
+    <!-- Connection Status -->
+    <div id="connectionStatus" class="connection-status disconnected">Disconnected</div>
+
     <!-- Main Menu -->
     <div id="mainMenu" class="screen active">
         <div class="menu-container">
-            <div class="logo-section">
-                <h1 class="game-title">
-                    <span class="title-main">QUORIDOR</span>
-                    <span class="title-sub">Wall Chess Master</span>
-                </h1>
-                <div class="logo-animation">
-                    <div class="chess-piece"></div>
-                    <div class="wall-animation"></div>
-                </div>
+            <div class="game-title">
+                <span class="title-main">QUORIDOR</span>
+                <span class="title-sub">Wall Chess Master</span>
             </div>
             
             <div class="menu-options">
                 <button class="menu-btn primary" onclick="showGameModes()">
-                    <span class="btn-icon">🎮</span>
-                    <span class="btn-text">Play Game</span>
-                </button>
-                <button class="menu-btn" onclick="showTutorial()">
-                    <span class="btn-icon">📚</span>
-                    <span class="btn-text">Tutorial</span>
-                </button>
-                <button class="menu-btn" onclick="showSettings()">
-                    <span class="btn-icon">⚙️</span>
-                    <span class="btn-text">Settings</span>
-                </button>
-                <button class="menu-btn" onclick="showStats()">
-                    <span class="btn-icon">📊</span>
-                    <span class="btn-text">Statistics</span>
+                    <span>🎮</span>
+                    <span>Play Game</span>
                 </button>
             </div>
         </div>
@@ -51,15 +642,10 @@
         <div class="menu-container">
             <h2 class="screen-title">Choose Game Mode</h2>
             <div class="game-modes">
-                <div class="mode-card" onclick="startGame('offline-human')">
+                <div class="mode-card" onclick="startLocalGame()">
                     <div class="mode-icon">👥</div>
                     <h3>Local Multiplayer</h3>
                     <p>Play with a friend on the same device</p>
-                </div>
-                <div class="mode-card" onclick="startGame('offline-ai')">
-                    <div class="mode-icon">🤖</div>
-                    <h3>vs Computer</h3>
-                    <p>Challenge our AI opponent</p>
                 </div>
                 <div class="mode-card" onclick="showOnlineMenu()">
                     <div class="mode-icon">🌐</div>
@@ -78,40 +664,14 @@
             <div class="online-options">
                 <div class="input-group">
                     <label for="playerName">Your Name</label>
-                    <input type="text" id="playerName" placeholder="Enter your name" maxlength="20">
+                    <input type="text" id="playerName" placeholder="Enter your name" maxlength="20" value="Player">
                 </div>
                 <div class="input-group">
                     <label for="roomCode">Room Code (Optional)</label>
-                    <input type="text" id="roomCode" placeholder="Enter room code" maxlength="8">
+                    <input type="text" id="roomCode" placeholder="Enter room code or leave empty" maxlength="8">
                 </div>
                 <div class="online-buttons">
-                    <button class="menu-btn primary" onclick="joinOnlineGame()">Join Game</button>
-                    <button class="menu-btn" onclick="createPrivateRoom()">Create Private Room</button>
-                </div>
-            </div>
-            <button class="back-btn" onclick="showGameModes()">← Back</button>
-        </div>
-    </div>
-
-    <!-- AI Difficulty Selection -->
-    <div id="aiDifficultyMenu" class="screen">
-        <div class="menu-container">
-            <h2 class="screen-title">Select AI Difficulty</h2>
-            <div class="difficulty-options">
-                <div class="difficulty-card" onclick="startAIGame('easy')">
-                    <div class="difficulty-icon">🟢</div>
-                    <h3>Easy</h3>
-                    <p>Perfect for beginners</p>
-                </div>
-                <div class="difficulty-card" onclick="startAIGame('medium')">
-                    <div class="difficulty-icon">🟡</div>
-                    <h3>Medium</h3>
-                    <p>Balanced challenge</p>
-                </div>
-                <div class="difficulty-card" onclick="startAIGame('hard')">
-                    <div class="difficulty-icon">🔴</div>
-                    <h3>Hard</h3>
-                    <p>Expert level AI</p>
+                    <button class="menu-btn primary" onclick="joinOnlineGame()">Join/Create Game</button>
                 </div>
             </div>
             <button class="back-btn" onclick="showGameModes()">← Back</button>
@@ -123,11 +683,11 @@
         <div class="game-header">
             <div class="game-info">
                 <div class="player-info" id="player1Info">
-                    <div class="player-avatar p1"></div>
+                    <div class="player-avatar p1">1</div>
                     <div class="player-details">
                         <span class="player-name" id="player1Name">Player 1</span>
                         <div class="walls-count">
-                            <span class="wall-icon">🧱</span>
+                            <span>🧱</span>
                             <span id="player1Walls">10</span>
                         </div>
                     </div>
@@ -142,33 +702,25 @@
                     <div class="player-details">
                         <span class="player-name" id="player2Name">Player 2</span>
                         <div class="walls-count">
-                            <span class="wall-icon">🧱</span>
+                            <span>🧱</span>
                             <span id="player2Walls">10</span>
                         </div>
                     </div>
-                    <div class="player-avatar p2"></div>
+                    <div class="player-avatar p2">2</div>
                 </div>
             </div>
             
             <div class="game-controls">
                 <button class="control-btn" id="moveBtn" onclick="setAction('move')">
-                    <span class="btn-icon">🚶</span>
-                    Move Pawn
+                    <span>🚶</span>
+                    Move
                 </button>
                 <button class="control-btn" id="wallBtn" onclick="setAction('wall')">
-                    <span class="btn-icon">🧱</span>
-                    Place Wall
+                    <span>🧱</span>
+                    Wall
                 </button>
-                <button class="control-btn" id="undoBtn" onclick="undoMove()">
-                    <span class="btn-icon">↶</span>
-                    Undo
-                </button>
-                <button class="control-btn" id="hintBtn" onclick="showHint()">
-                    <span class="btn-icon">💡</span>
-                    Hint
-                </button>
-                <button class="control-btn danger" onclick="showPauseMenu()">
-                    <span class="btn-icon">⏸️</span>
+                <button class="control-btn" onclick="quitGame()">
+                    <span>🏠</span>
                     Menu
                 </button>
             </div>
@@ -178,183 +730,781 @@
             <div class="board-wrapper">
                 <div id="gameBoard" class="game-board"></div>
                 <div id="wallsLayer" class="walls-layer"></div>
-                <div id="effectsLayer" class="effects-layer"></div>
             </div>
-        </div>
-
-        <div class="move-history" id="moveHistory">
-            <h3>Move History</h3>
-            <div class="history-list" id="historyList"></div>
-        </div>
-    </div>
-
-    <!-- Pause Menu -->
-    <div id="pauseMenu" class="modal">
-        <div class="modal-content">
-            <h2>Game Paused</h2>
-            <div class="modal-buttons">
-                <button class="menu-btn" onclick="resumeGame()">Resume Game</button>
-                <button class="menu-btn" onclick="restartGame()">Restart Game</button>
-                <button class="menu-btn" onclick="showSettings()">Settings</button>
-                <button class="menu-btn danger" onclick="quitGame()">Quit to Menu</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Game Over Modal -->
-    <div id="gameOverModal" class="modal">
-        <div class="modal-content">
-            <div class="winner-animation" id="winnerAnimation"></div>
-            <h2 id="gameOverTitle">Game Over</h2>
-            <p id="gameOverMessage"></p>
-            <div class="game-stats" id="gameStats"></div>
-            <div class="modal-buttons">
-                <button class="menu-btn primary" onclick="restartGame()">Play Again</button>
-                <button class="menu-btn" onclick="showMainMenu()">Main Menu</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Tutorial Modal -->
-    <div id="tutorialModal" class="modal">
-        <div class="modal-content large">
-            <h2>How to Play Quoridor</h2>
-            <div class="tutorial-content">
-                <div class="tutorial-step active" data-step="1">
-                    <h3>Objective</h3>
-                    <p>Be the first player to reach the opposite side of the board!</p>
-                    <div class="tutorial-visual">
-                        <div class="mini-board">
-                            <div class="goal-line top">Player 2's Goal</div>
-                            <div class="mini-pawn p1" style="bottom: 10px;"></div>
-                            <div class="mini-pawn p2" style="top: 10px;"></div>
-                            <div class="goal-line bottom">Player 1's Goal</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="tutorial-step" data-step="2">
-                    <h3>Moving Your Pawn</h3>
-                    <p>Move one square at a time in any direction (up, down, left, right).</p>
-                    <p>You can jump over your opponent if they're adjacent and there's space behind them.</p>
-                </div>
-                <div class="tutorial-step" data-step="3">
-                    <h3>Placing Walls</h3>
-                    <p>Each player starts with 10 walls. Walls block movement but cannot completely block a player's path to their goal.</p>
-                    <p>Press R to rotate walls before placing them.</p>
-                </div>
-                <div class="tutorial-step" data-step="4">
-                    <h3>Strategy Tips</h3>
-                    <p>• Use walls to slow down your opponent</p>
-                    <p>• Save some walls for defense</p>
-                    <p>• Plan your path carefully</p>
-                    <p>• Watch for jumping opportunities</p>
-                </div>
-            </div>
-            <div class="tutorial-navigation">
-                <button class="nav-btn" id="prevStep" onclick="previousTutorialStep()">← Previous</button>
-                <div class="step-indicators" id="stepIndicators"></div>
-                <button class="nav-btn" id="nextStep" onclick="nextTutorialStep()">Next →</button>
-            </div>
-            <button class="close-btn" onclick="closeTutorial()">×</button>
-        </div>
-    </div>
-
-    <!-- Settings Modal -->
-    <div id="settingsModal" class="modal">
-        <div class="modal-content">
-            <h2>Settings</h2>
-            <div class="settings-content">
-                <div class="setting-group">
-                    <label>Sound Effects</label>
-                    <div class="toggle-switch">
-                        <input type="checkbox" id="soundToggle" checked>
-                        <span class="slider"></span>
-                    </div>
-                </div>
-                <div class="setting-group">
-                    <label>Background Music</label>
-                    <div class="toggle-switch">
-                        <input type="checkbox" id="musicToggle" checked>
-                        <span class="slider"></span>
-                    </div>
-                </div>
-                <div class="setting-group">
-                    <label>Show Move Hints</label>
-                    <div class="toggle-switch">
-                        <input type="checkbox" id="hintsToggle" checked>
-                        <span class="slider"></span>
-                    </div>
-                </div>
-                <div class="setting-group">
-                    <label>Animation Speed</label>
-                    <select id="animationSpeed">
-                        <option value="slow">Slow</option>
-                        <option value="normal" selected>Normal</option>
-                        <option value="fast">Fast</option>
-                    </select>
-                </div>
-                <div class="setting-group">
-                    <label>Board Theme</label>
-                    <select id="boardTheme">
-                        <option value="classic" selected>Classic</option>
-                        <option value="modern">Modern</option>
-                        <option value="neon">Neon</option>
-                        <option value="wood">Wood</option>
-                    </select>
-                </div>
-            </div>
-            <button class="close-btn" onclick="closeSettings()">×</button>
-        </div>
-    </div>
-
-    <!-- Statistics Modal -->
-    <div id="statsModal" class="modal">
-        <div class="modal-content">
-            <h2>Your Statistics</h2>
-            <div class="stats-content">
-                <div class="stat-card">
-                    <div class="stat-number" id="totalGames">0</div>
-                    <div class="stat-label">Total Games</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number" id="gamesWon">0</div>
-                    <div class="stat-label">Games Won</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number" id="winRate">0%</div>
-                    <div class="stat-label">Win Rate</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number" id="avgMoves">0</div>
-                    <div class="stat-label">Avg Moves</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number" id="bestTime">--:--</div>
-                    <div class="stat-label">Best Time</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number" id="totalPlayTime">0h 0m</div>
-                    <div class="stat-label">Total Play Time</div>
-                </div>
-            </div>
-            <button class="menu-btn" onclick="resetStats()">Reset Statistics</button>
-            <button class="close-btn" onclick="closeStats()">×</button>
         </div>
     </div>
 
     <!-- Toast Notifications -->
     <div id="toast" class="toast"></div>
 
-    <!-- Loading Screen -->
-    <div id="loadingScreen" class="loading-screen">
-        <div class="loading-content">
-            <div class="loading-spinner"></div>
-            <p id="loadingText">Loading...</p>
-        </div>
-    </div>
-
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-    <script src="game.js"></script>
-    <script src="ai.js"></script>
-    <script src="ui.js"></script>
-    <script src="online.js"></script>
+    <script>
+        // Game State
+        class GameState {
+            constructor() {
+                this.board = this.initializeBoard();
+                this.players = [
+                    { id: 0, name: 'Player 1', position: { x: 4, y: 0 }, walls: 10 },
+                    { id: 1, name: 'Player 2', position: { x: 4, y: 8 }, walls: 10 }
+                ];
+                this.currentPlayer = 0;
+                this.gameStatus = 'waiting';
+                this.currentAction = null;
+                this.isOnline = false;
+                this.myPlayerId = null;
+                this.roomCode = null;
+                this.startTime = null;
+                this.timerInterval = null;
+            }
+
+            initializeBoard() {
+                return {
+                    horizontalWalls: Array(8).fill().map(() => Array(9).fill(false)),
+                    verticalWalls: Array(9).fill().map(() => Array(8).fill(false))
+                };
+            }
+
+            startGame(isOnline = false) {
+                this.gameStatus = 'playing';
+                this.startTime = Date.now();
+                this.isOnline = isOnline;
+                this.startTimer();
+                this.updateUI();
+            }
+
+            startTimer() {
+                this.timerInterval = setInterval(() => {
+                    if (this.gameStatus === 'playing') {
+                        const elapsed = Date.now() - this.startTime;
+                        const minutes = Math.floor(elapsed / 60000);
+                        const seconds = Math.floor((elapsed % 60000) / 1000);
+                        const timeString = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                        document.getElementById('gameTimer').textContent = timeString;
+                    }
+                }, 1000);
+            }
+
+            stopTimer() {
+                if (this.timerInterval) {
+                    clearInterval(this.timerInterval);
+                    this.timerInterval = null;
+                }
+            }
+
+            makeMove(playerId, position) {
+                if (this.gameStatus !== 'playing') return false;
+                if (this.isOnline && playerId !== this.myPlayerId) return false;
+                if (!this.isOnline && this.currentPlayer !== playerId) return false;
+
+                if (!this.isValidMove(this.players[playerId].position, position)) {
+                    showToast('Invalid move!', 'error');
+                    return false;
+                }
+
+                if (this.isOnline) {
+                    socket.emit('movePawn', {
+                        roomCode: this.roomCode,
+                        playerId: playerId,
+                        position: position
+                    });
+                } else {
+                    this.executeMove(playerId, position);
+                }
+                return true;
+            }
+
+            executeMove(playerId, position) {
+                this.players[playerId].position = position;
+                
+                if (this.checkWinCondition(playerId)) {
+                    this.endGame(playerId);
+                    return;
+                }
+
+                this.currentPlayer = (this.currentPlayer + 1) % 2;
+                this.currentAction = null;
+                this.updateUI();
+            }
+
+            placeWall(playerId, wall) {
+                if (this.gameStatus !== 'playing') return false;
+                if (this.isOnline && playerId !== this.myPlayerId) return false;
+                if (!this.isOnline && this.currentPlayer !== playerId) return false;
+
+                if (this.players[playerId].walls <= 0) {
+                    showToast('No walls remaining!', 'error');
+                    return false;
+                }
+
+                if (!this.isValidWallPlacement(wall)) {
+                    showToast('Invalid wall placement!', 'error');
+                    return false;
+                }
+
+                if (this.isOnline) {
+                    socket.emit('placeWall', {
+                        roomCode: this.roomCode,
+                        playerId: playerId,
+                        wall: wall
+                    });
+                } else {
+                    this.executeWallPlacement(playerId, wall);
+                }
+                return true;
+            }
+
+            executeWallPlacement(playerId, wall) {
+                this.placeWallOnBoard(wall);
+                this.players[playerId].walls--;
+                this.currentPlayer = (this.currentPlayer + 1) % 2;
+                this.currentAction = null;
+                this.updateUI();
+            }
+
+            isValidMove(from, to) {
+                if (to.x < 0 || to.x > 8 || to.y < 0 || to.y > 8) return false;
+                if (this.isCellOccupied(to)) return false;
+
+                const dx = Math.abs(to.x - from.x);
+                const dy = Math.abs(to.y - from.y);
+
+                if ((dx === 1 && dy === 0) || (dx === 0 && dy === 1)) {
+                    return !this.isWallBetween(from, to);
+                }
+
+                if ((dx === 2 && dy === 0) || (dx === 0 && dy === 2)) {
+                    const midPoint = {
+                        x: from.x + (to.x - from.x) / 2,
+                        y: from.y + (to.y - from.y) / 2
+                    };
+                    
+                    if (!this.isCellOccupied(midPoint)) return false;
+                    return !this.isWallBetween(from, midPoint) && !this.isWallBetween(midPoint, to);
+                }
+
+                if (dx === 1 && dy === 1) {
+                    const opponentPos = this.findOpponentAdjacentTo(from);
+                    if (!opponentPos) return false;
+                    
+                    const straightJump = {
+                        x: from.x + (opponentPos.x - from.x) * 2,
+                        y: from.y + (opponentPos.y - from.y) * 2
+                    };
+                    
+                    if (straightJump.x >= 0 && straightJump.x <= 8 && 
+                        straightJump.y >= 0 && straightJump.y <= 8 && 
+                        !this.isCellOccupied(straightJump) && 
+                        !this.isWallBetween(opponentPos, straightJump)) {
+                        return false;
+                    }
+                    
+                    return !this.isWallBetween(from, opponentPos) && !this.isWallBetween(opponentPos, to);
+                }
+
+                return false;
+            }
+
+            isValidWallPlacement(wall) {
+                const { x, y, orientation } = wall;
+
+                if (orientation === 'horizontal') {
+                    if (x < 0 || x > 7 || y < 1 || y > 8) return false;
+                    if (this.board.horizontalWalls[x][y] || this.board.horizontalWalls[x + 1][y]) return false;
+                } else {
+                    if (x < 1 || x > 8 || y < 0 || y > 7) return false;
+                    if (this.board.verticalWalls[x][y] || this.board.verticalWalls[x][y + 1]) return false;
+                }
+
+                if (orientation === 'horizontal' && y > 0 && y < 8) {
+                    if (this.board.verticalWalls[x + 1][y - 1] && this.board.verticalWalls[x + 1][y]) return false;
+                } else if (orientation === 'vertical' && x > 0 && x < 8) {
+                    if (this.board.horizontalWalls[x - 1][y + 1] && this.board.horizontalWalls[x][y + 1]) return false;
+                }
+
+                const tempBoard = JSON.parse(JSON.stringify(this.board));
+                this.placeWallOnTempBoard(tempBoard, wall);
+                
+                for (let player of this.players) {
+                    if (!this.hasPathToGoal(tempBoard, player.position, player.id)) {
+                        return false;
+                    }
+                }
+
+                return true;
+            }
+
+            placeWallOnBoard(wall) {
+                const { x, y, orientation } = wall;
+                
+                if (orientation === 'horizontal') {
+                    this.board.horizontalWalls[x][y] = true;
+                    this.board.horizontalWalls[x + 1][y] = true;
+                } else {
+                    this.board.verticalWalls[x][y] = true;
+                    this.board.verticalWalls[x][y + 1] = true;
+                }
+            }
+
+            placeWallOnTempBoard(board, wall) {
+                const { x, y, orientation } = wall;
+                
+                if (orientation === 'horizontal') {
+                    board.horizontalWalls[x][y] = true;
+                    board.horizontalWalls[x + 1][y] = true;
+                } else {
+                    board.verticalWalls[x][y] = true;
+                    board.verticalWalls[x][y + 1] = true;
+                }
+            }
+
+            isWallBetween(pos1, pos2) {
+                if (pos1.x === pos2.x) {
+                    const x = pos1.x;
+                    const minY = Math.min(pos1.y, pos2.y);
+                    return this.board.horizontalWalls[x][minY + 1];
+                } else if (pos1.y === pos2.y) {
+                    const y = pos1.y;
+                    const minX = Math.min(pos1.x, pos2.x);
+                    return this.board.verticalWalls[minX + 1][y];
+                }
+                return false;
+            }
+
+            isCellOccupied(pos) {
+                return this.players.some(player => 
+                    player.position.x === pos.x && player.position.y === pos.y
+                );
+            }
+
+            findOpponentAdjacentTo(pos) {
+                const directions = [
+                    { x: 0, y: 1 }, { x: 0, y: -1 },
+                    { x: 1, y: 0 }, { x: -1, y: 0 }
+                ];
+                
+                for (let dir of directions) {
+                    const checkPos = { x: pos.x + dir.x, y: pos.y + dir.y };
+                    if (this.isCellOccupied(checkPos)) {
+                        return checkPos;
+                    }
+                }
+                return null;
+            }
+
+            hasPathToGoal(board, position, playerId) {
+                const visited = Array(9).fill().map(() => Array(9).fill(false));
+                const queue = [position];
+                visited[position.x][position.y] = true;
+                
+                const goalY = playerId === 0 ? 8 : 0;
+                
+                while (queue.length > 0) {
+                    const pos = queue.shift();
+                    
+                    if (pos.y === goalY) return true;
+                    
+                    const directions = [
+                        { x: 0, y: 1 }, { x: 0, y: -1 },
+                        { x: 1, y: 0 }, { x: -1, y: 0 }
+                    ];
+                    
+                    for (let dir of directions) {
+                        const newPos = { x: pos.x + dir.x, y: pos.y + dir.y };
+                        
+                        if (newPos.x < 0 || newPos.x > 8 || newPos.y < 0 || newPos.y > 8) continue;
+                        if (visited[newPos.x][newPos.y]) continue;
+                        if (this.isWallBetweenOnBoard(board, pos, newPos)) continue;
+                        
+                        visited[newPos.x][newPos.y] = true;
+                        queue.push(newPos);
+                    }
+                }
+                
+                return false;
+            }
+
+            isWallBetweenOnBoard(board, pos1, pos2) {
+                if (pos1.x === pos2.x) {
+                    const x = pos1.x;
+                    const minY = Math.min(pos1.y, pos2.y);
+                    return board.horizontalWalls[x][minY + 1];
+                } else if (pos1.y === pos2.y) {
+                    const y = pos1.y;
+                    const minX = Math.min(pos1.x, pos2.x);
+                    return board.verticalWalls[minX + 1][y];
+                }
+                return false;
+            }
+
+            checkWinCondition(playerId) {
+                const player = this.players[playerId];
+                return (playerId === 0 && player.position.y === 8) || 
+                       (playerId === 1 && player.position.y === 0);
+            }
+
+            endGame(winner) {
+                this.gameStatus = 'finished';
+                this.stopTimer();
+                const winnerName = this.players[winner].name;
+                showToast(`${winnerName} wins!`, 'success', 5000);
+                
+                setTimeout(() => {
+                    if (confirm(`${winnerName} wins! Play again?`)) {
+                        if (this.isOnline) {
+                            // Reset for online game
+                            this.resetGame();
+                        } else {
+                            this.resetGame();
+                            this.startGame(false);
+                        }
+                    } else {
+                        showMainMenu();
+                    }
+                }, 2000);
+            }
+
+            resetGame() {
+                this.board = this.initializeBoard();
+                this.players[0].position = { x: 4, y: 0 };
+                this.players[1].position = { x: 4, y: 8 };
+                this.players[0].walls = 10;
+                this.players[1].walls = 10;
+                this.currentPlayer = 0;
+                this.currentAction = null;
+                this.stopTimer();
+            }
+
+            getValidMoves(playerId) {
+                const player = this.players[playerId];
+                const moves = [];
+                
+                for (let x = 0; x < 9; x++) {
+                    for (let y = 0; y < 9; y++) {
+                        const move = { x, y };
+                        if (this.isValidMove(player.position, move)) {
+                            moves.push(move);
+                        }
+                    }
+                }
+                
+                return moves;
+            }
+
+            getValidWallPlacements(playerId) {
+                const walls = [];
+                
+                for (let x = 0; x < 8; x++) {
+                    for (let y = 1; y < 9; y++) {
+                        const wall = { x, y, orientation: 'horizontal' };
+                        if (this.isValidWallPlacement(wall)) {
+                            walls.push(wall);
+                        }
+                    }
+                }
+                
+                for (let x = 1; x < 9; x++) {
+                    for (let y = 0; y < 8; y++) {
+                        const wall = { x, y, orientation: 'vertical' };
+                        if (this.isValidWallPlacement(wall)) {
+                            walls.push(wall);
+                        }
+                    }
+                }
+                
+                return walls;
+            }
+
+            updateUI() {
+                updatePlayerInfo();
+                updateBoard();
+                updateWalls();
+                updateTurnIndicator();
+                updateActionButtons();
+                
+                if (this.currentAction === 'move') {
+                    highlightValidMoves();
+                } else {
+                    clearHighlights();
+                }
+                
+                if (this.currentAction === 'wall') {
+                    showWallPreviews();
+                } else {
+                    clearWallPreviews();
+                }
+            }
+        }
+
+        // Initialize game
+        const game = new GameState();
+        let socket = null;
+
+        // Socket.IO connection
+        function connectToServer() {
+            socket = io('https://wall-chess.onrender.com');
+            
+            socket.on('connect', () => {
+                document.getElementById('connectionStatus').textContent = 'Connected';
+                document.getElementById('connectionStatus').className = 'connection-status connected';
+            });
+
+            socket.on('disconnect', () => {
+                document.getElementById('connectionStatus').textContent = 'Disconnected';
+                document.getElementById('connectionStatus').className = 'connection-status disconnected';
+            });
+
+            socket.on('roomJoined', (data) => {
+                game.roomCode = data.roomCode;
+                game.myPlayerId = data.playerId;
+                game.players[game.myPlayerId].name = document.getElementById('playerName').value || 'Player';
+                showToast(`Joined room: ${data.roomCode}`, 'success');
+                
+                if (data.playerId === 1) {
+                    showToast('Waiting for game to start...', 'info');
+                }
+            });
+
+            socket.on('gameStarted', (gameData) => {
+                game.players[0].name = gameData.players[0].name || 'Player 1';
+                game.players[1].name = gameData.players[1].name || 'Player 2';
+                game.startGame(true);
+                showScreen('gameScreen');
+                createBoard();
+                showToast('Game started!', 'success');
+            });
+
+            socket.on('gameUpdated', (gameData) => {
+                game.board = gameData.board;
+                game.players = gameData.players;
+                game.currentPlayer = gameData.currentTurn;
+                game.updateUI();
+            });
+
+            socket.on('gameOver', (data) => {
+                game.endGame(data.winner);
+            });
+
+            socket.on('playerLeft', () => {
+                showToast('Opponent left the game', 'error');
+                setTimeout(() => showMainMenu(), 3000);
+            });
+
+            socket.on('error', (data) => {
+                showToast(data.message, 'error');
+            });
+        }
+
+        // UI Functions
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(screen => {
+                screen.classList.remove('active');
+            });
+            
+            const targetScreen = document.getElementById(screenId);
+            if (targetScreen) {
+                targetScreen.classList.add('active');
+            }
+        }
+
+        function showToast(message, type = 'info', duration = 3000) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = `toast ${type}`;
+            toast.classList.add('show');
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, duration);
+        }
+
+        function showMainMenu() {
+            game.resetGame();
+            game.gameStatus = 'waiting';
+            game.isOnline = false;
+            showScreen('mainMenu');
+        }
+
+        function showGameModes() {
+            showScreen('gameModeMenu');
+        }
+
+        function showOnlineMenu() {
+            if (!socket) {
+                connectToServer();
+            }
+            showScreen('onlineMenu');
+        }
+
+        function startLocalGame() {
+            game.startGame(false);
+            showScreen('gameScreen');
+            createBoard();
+        }
+
+        function joinOnlineGame() {
+            const playerName = document.getElementById('playerName').value || 'Player';
+            const roomCode = document.getElementById('roomCode').value || Math.random().toString(36).substring(2, 8);
+            
+            if (!socket || !socket.connected) {
+                showToast('Connecting to server...', 'info');
+                connectToServer();
+                setTimeout(() => {
+                    if (socket && socket.connected) {
+                        socket.emit('joinRoom', { roomCode, playerName });
+                    }
+                }, 1000);
+            } else {
+                socket.emit('joinRoom', { roomCode, playerName });
+            }
+        }
+
+        function createBoard() {
+            const board = document.getElementById('gameBoard');
+            board.innerHTML = '';
+            
+            for (let y = 0; y < 9; y++) {
+                for (let x = 0; x < 9; x++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    cell.dataset.x = x;
+                    cell.dataset.y = y;
+                    
+                    cell.addEventListener('click', () => handleCellClick(x, y));
+                    
+                    board.appendChild(cell);
+                }
+            }
+            
+            game.updateUI();
+        }
+
+        function handleCellClick(x, y) {
+            if (game.gameStatus !== 'playing') return;
+            
+            const playerId = game.isOnline ? game.myPlayerId : game.currentPlayer;
+            
+            if (game.currentAction === 'move') {
+                const move = { x, y };
+                if (game.makeMove(playerId, move)) {
+                    clearHighlights();
+                    game.currentAction = null;
+                    updateActionButtons();
+                }
+            }
+        }
+
+        function updatePlayerInfo() {
+            document.getElementById('player1Name').textContent = game.players[0].name;
+            document.getElementById('player2Name').textContent = game.players[1].name;
+            document.getElementById('player1Walls').textContent = game.players[0].walls;
+            document.getElementById('player2Walls').textContent = game.players[1].walls;
+            
+            const player1Avatar = document.querySelector('.player-avatar.p1');
+            const player2Avatar = document.querySelector('.player-avatar.p2');
+            
+            player1Avatar.classList.toggle('active', game.currentPlayer === 0);
+            player2Avatar.classList.toggle('active', game.currentPlayer === 1);
+        }
+
+        function updateBoard() {
+            document.querySelectorAll('.pawn').forEach(pawn => pawn.remove());
+            
+            game.players.forEach((player, index) => {
+                const cell = document.querySelector(`[data-x="${player.position.x}"][data-y="${player.position.y}"]`);
+                if (cell) {
+                    const pawn = document.createElement('div');
+                    pawn.className = `pawn p${index + 1}`;
+                    pawn.textContent = index + 1;
+                    cell.appendChild(pawn);
+                }
+            });
+        }
+
+        function updateWalls() {
+            const wallsLayer = document.getElementById('wallsLayer');
+            wallsLayer.querySelectorAll('.wall:not(.preview)').forEach(wall => wall.remove());
+            
+            const cellSize = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--cell-size'));
+            const gap = 4;
+            
+            for (let x = 0; x < 8; x++) {
+                for (let y = 0; y < 9; y++) {
+                    if (game.board.horizontalWalls[x][y]) {
+                        const wall = document.createElement('div');
+                        wall.className = 'wall horizontal';
+                        
+                        const left = x * (cellSize + gap) + cellSize / 2;
+                        const top = y * (cellSize + gap) - 4;
+                        
+                        wall.style.left = `${left}px`;
+                        wall.style.top = `${top}px`;
+                        
+                        wallsLayer.appendChild(wall);
+                    }
+                }
+            }
+            
+            for (let x = 0; x < 9; x++) {
+                for (let y = 0; y < 8; y++) {
+                    if (game.board.verticalWalls[x][y]) {
+                        const wall = document.createElement('div');
+                        wall.className = 'wall vertical';
+                        
+                        const left = x * (cellSize + gap) - 4;
+                        const top = y * (cellSize + gap) + cellSize / 2;
+                        
+                        wall.style.left = `${left}px`;
+                        wall.style.top = `${top}px`;
+                        
+                        wallsLayer.appendChild(wall);
+                    }
+                }
+            }
+        }
+
+        function updateTurnIndicator() {
+            const turnIndicator = document.getElementById('turnIndicator');
+            const currentPlayer = game.players[game.currentPlayer];
+            
+            if (game.gameStatus === 'playing') {
+                if (game.isOnline) {
+                    if (game.currentPlayer === game.myPlayerId) {
+                        turnIndicator.textContent = 'Your Turn';
+                    } else {
+                        turnIndicator.textContent = `${currentPlayer.name}'s Turn`;
+                    }
+                } else {
+                    turnIndicator.textContent = `${currentPlayer.name}'s Turn`;
+                }
+            }
+        }
+
+        function updateActionButtons() {
+            const moveBtn = document.getElementById('moveBtn');
+            const wallBtn = document.getElementById('wallBtn');
+            
+            const isMyTurn = game.gameStatus === 'playing' && 
+                           (!game.isOnline || game.currentPlayer === game.myPlayerId);
+            
+            moveBtn.disabled = !isMyTurn;
+            wallBtn.disabled = !isMyTurn || (game.isOnline ? 
+                game.players[game.myPlayerId].walls <= 0 : 
+                game.players[game.currentPlayer].walls <= 0);
+            
+            moveBtn.classList.toggle('active', game.currentAction === 'move');
+            wallBtn.classList.toggle('active', game.currentAction === 'wall');
+        }
+
+        function highlightValidMoves() {
+            clearHighlights();
+            
+            const playerId = game.isOnline ? game.myPlayerId : game.currentPlayer;
+            const validMoves = game.getValidMoves(playerId);
+            
+            validMoves.forEach(move => {
+                const cell = document.querySelector(`[data-x="${move.x}"][data-y="${move.y}"]`);
+                if (cell) {
+                    cell.classList.add('valid-move');
+                }
+            });
+        }
+
+        function clearHighlights() {
+            document.querySelectorAll('.valid-move').forEach(cell => {
+                cell.classList.remove('valid-move');
+            });
+        }
+
+        function showWallPreviews() {
+            clearWallPreviews();
+            
+            const playerId = game.isOnline ? game.myPlayerId : game.currentPlayer;
+            const validWalls = game.getValidWallPlacements(playerId);
+            const cellSize = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--cell-size'));
+            const gap = 4;
+            const wallsLayer = document.getElementById('wallsLayer');
+            
+            validWalls.slice(0, 20).forEach(wall => {
+                const preview = document.createElement('div');
+                preview.className = `wall preview ${wall.orientation}`;
+                
+                let left, top;
+                
+                if (wall.orientation === 'horizontal') {
+                    left = wall.x * (cellSize + gap) + cellSize / 2;
+                    top = wall.y * (cellSize + gap) - 4;
+                } else {
+                    left = wall.x * (cellSize + gap) - 4;
+                    top = wall.y * (cellSize + gap) + cellSize / 2;
+                }
+                
+                preview.style.left = `${left}px`;
+                preview.style.top = `${top}px`;
+                
+                preview.addEventListener('click', () => {
+                    if (game.placeWall(playerId, wall)) {
+                        clearWallPreviews();
+                        game.currentAction = null;
+                        updateActionButtons();
+                    }
+                });
+                
+                wallsLayer.appendChild(preview);
+            });
+        }
+
+        function clearWallPreviews() {
+            document.querySelectorAll('.wall.preview').forEach(preview => preview.remove());
+        }
+
+        function setAction(action) {
+            if (game.gameStatus !== 'playing') return;
+            
+            const isMyTurn = !game.isOnline || game.currentPlayer === game.myPlayerId;
+            if (!isMyTurn) return;
+            
+            if (game.currentAction === action) {
+                game.currentAction = null;
+                clearHighlights();
+                clearWallPreviews();
+            } else {
+                game.currentAction = action;
+                clearHighlights();
+                clearWallPreviews();
+                
+                if (action === 'move') {
+                    highlightValidMoves();
+                } else if (action === 'wall') {
+                    showWallPreviews();
+                }
+            }
+            
+            updateActionButtons();
+        }
+
+        function quitGame() {
+            if (confirm('Are you sure you want to quit the game?')) {
+                if (game.isOnline && socket) {
+                    socket.disconnect();
+                    socket = null;
+                }
+                showMainMenu();
+            }
+        }
+
+        // Keyboard controls
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                if (game.gameStatus === 'playing') {
+                    quitGame();
+                }
+            }
+        });
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            showMainMenu();
+        });
+    </script>
+</body>
+</html>
