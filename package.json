@@ -1,0 +1,30 @@
+{
+  "name": "quoridor-wall-chess",
+  "version": "1.0.0",
+  "description": "A web-based implementation of the Quoridor (wall chess) board game",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "keywords": [
+    "quoridor",
+    "wall-chess",
+    "board-game",
+    "multiplayer",
+    "socket.io",
+    "express"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "socket.io": "^4.7.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  }
+}

@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quoridor - Wall Chess Master</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Particle Background -->
+    <div id="particles"></div>
+    
+    <!-- Main Menu -->
+    <div id="mainMenu" class="screen active">
+        <div class="menu-container">
+            <div class="logo-section">
+                <h1 class="game-title">
+                    <span class="title-main">QUORIDOR</span>
+                    <span class="title-sub">Wall Chess Master</span>
+                </h1>
+                <div class="logo-animation">
+                    <div class="chess-piece"></div>
+                    <div class="wall-animation"></div>
+                </div>
+            </div>
+            
+            <div class="menu-options">
+                <button class="menu-btn primary" onclick="showGameModes()">
+                    <span class="btn-icon">🎮</span>
+                    <span class="btn-text">Play Game</span>
+                </button>
+                <button class="menu-btn" onclick="showTutorial()">
+                    <span class="btn-icon">📚</span>
+                    <span class="btn-text">Tutorial</span>
+                </button>
+                <button class="menu-btn" onclick="showSettings()">
+                    <span class="btn-icon">⚙️</span>
+                    <span class="btn-text">Settings</span>
+                </button>
+                <button class="menu-btn" onclick="showStats()">
+                    <span class="btn-icon">📊</span>
+                    <span class="btn-text">Statistics</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Mode Selection -->
+    <div id="gameModeMenu" class="screen">
+        <div class="menu-container">
+            <h2 class="screen-title">Choose Game Mode</h2>
+            <div class="game-modes">
+                <div class="mode-card" onclick="startGame('offline-human')">
+                    <div class="mode-icon">👥</div>
+                    <h3>Local Multiplayer</h3>
+                    <p>Play with a friend on the same device</p>
+                </div>
+                <div class="mode-card" onclick="startGame('offline-ai')">
+                    <div class="mode-icon">🤖</div>
+                    <h3>vs Computer</h3>
+                    <p>Challenge our AI opponent</p>
+                </div>
+                <div class="mode-card" onclick="showOnlineMenu()">
+                    <div class="mode-icon">🌐</div>
+                    <h3>Online Multiplayer</h3>
+                    <p>Play with players worldwide</p>
+                </div>
+            </div>
+            <button class="back-btn" onclick="showMainMenu()">← Back</button>
+        </div>
+    </div>
+
+    <!-- Online Menu -->
+    <div id="onlineMenu" class="screen">
+        <div class="menu-container">
+            <h2 class="screen-title">Online Multiplayer</h2>
+            <div class="online-options">
+                <div class="input-group">
+                    <label for="playerName">Your Name</label>
+                    <input type="text" id="playerName" placeholder="Enter your name" maxlength="20">
+                </div>
+                <div class="input-group">
+                    <label for="roomCode">Room Code (Optional)</label>
+                    <input type="text" id="roomCode" placeholder="Enter room code" maxlength="8">
+                </div>
+                <div class="online-buttons">
+                    <button class="menu-btn primary" onclick="joinOnlineGame()">Join Game</button>
+                    <button class="menu-btn" onclick="createPrivateRoom()">Create Private Room</button>
+                </div>
+            </div>
+            <button class="back-btn" onclick="showGameModes()">← Back</button>
+        </div>
+    </div>
+
+    <!-- AI Difficulty Selection -->
+    <div id="aiDifficultyMenu" class="screen">
+        <div class="menu-container">
+            <h2 class="screen-title">Select AI Difficulty</h2>
+            <div class="difficulty-options">
+                <div class="difficulty-card" onclick="startAIGame('easy')">
+                    <div class="difficulty-icon">🟢</div>
+                    <h3>Easy</h3>
+                    <p>Perfect for beginners</p>
+                </div>
+                <div class="difficulty-card" onclick="startAIGame('medium')">
+                    <div class="difficulty-icon">🟡</div>
+                    <h3>Medium</h3>
+                    <p>Balanced challenge</p>
+                </div>
+                <div class="difficulty-card" onclick="startAIGame('hard')">
+                    <div class="difficulty-icon">🔴</div>
+                    <h3>Hard</h3>
+                    <p>Expert level AI</p>
+                </div>
+            </div>
+            <button class="back-btn" onclick="showGameModes()">← Back</button>
+        </div>
+    </div>
+
+    <!-- Game Screen -->
+    <div id="gameScreen" class="screen">
+        <div class="game-header">
+            <div class="game-info">
+                <div class="player-info" id="player1Info">
+                    <div class="player-avatar p1"></div>
+                    <div class="player-details">
+                        <span class="player-name" id="player1Name">Player 1</span>
+                        <div class="walls-count">
+                            <span class="wall-icon">🧱</span>
+                            <span id="player1Walls">10</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="game-status">
+                    <div class="turn-indicator" id="turnIndicator">Player 1's Turn</div>
+                    <div class="game-timer" id="gameTimer">00:00</div>
+                </div>
+                
+                <div class="player-info" id="player2Info">
+                    <div class="player-details">
+                        <span class="player-name" id="player2Name">Player 2</span>
+                        <div class="walls-count">
+                            <span class="wall-icon">🧱</span>
+                            <span id="player2Walls">10</span>
+                        </div>
+                    </div>
+                    <div class="player-avatar p2"></div>
+                </div>
+            </div>
+            
+            <div class="game-controls">
+                <button class="control-btn" id="moveBtn" onclick="setAction('move')">
+                    <span class="btn-icon">🚶</span>
+                    Move Pawn
+                </button>
+                <button class="control-btn" id="wallBtn" onclick="setAction('wall')">
+                    <span class="btn-icon">🧱</span>
+                    Place Wall
+                </button>
+                <button class="control-btn" id="undoBtn" onclick="undoMove()">
+                    <span class="btn-icon">↶</span>
+                    Undo
+                </button>
+                <button class="control-btn" id="hintBtn" onclick="showHint()">
+                    <span class="btn-icon">💡</span>
+                    Hint
+                </button>
+                <button class="control-btn danger" onclick="showPauseMenu()">
+                    <span class="btn-icon">⏸️</span>
+                    Menu
+                </button>
+            </div>
+        </div>
+
+        <div class="game-board-container">
+            <div class="board-wrapper">
+                <div id="gameBoard" class="game-board"></div>
+                <div id="wallsLayer" class="walls-layer"></div>
+                <div id="effectsLayer" class="effects-layer"></div>
+            </div>
+        </div>
+
+        <div class="move-history" id="moveHistory">
+            <h3>Move History</h3>
+            <div class="history-list" id="historyList"></div>
+        </div>
+    </div>
+
+    <!-- Pause Menu -->
+    <div id="pauseMenu" class="modal">
+        <div class="modal-content">
+            <h2>Game Paused</h2>
+            <div class="modal-buttons">
+                <button class="menu-btn" onclick="resumeGame()">Resume Game</button>
+                <button class="menu-btn" onclick="restartGame()">Restart Game</button>
+                <button class="menu-btn" onclick="showSettings()">Settings</button>
+                <button class="menu-btn danger" onclick="quitGame()">Quit to Menu</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Over Modal -->
+    <div id="gameOverModal" class="modal">
+        <div class="modal-content">
+            <div class="winner-animation" id="winnerAnimation"></div>
+            <h2 id="gameOverTitle">Game Over</h2>
+            <p id="gameOverMessage"></p>
+            <div class="game-stats" id="gameStats"></div>
+            <div class="modal-buttons">
+                <button class="menu-btn primary" onclick="restartGame()">Play Again</button>
+                <button class="menu-btn" onclick="showMainMenu()">Main Menu</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tutorial Modal -->
+    <div id="tutorialModal" class="modal">
+        <div class="modal-content large">
+            <h2>How to Play Quoridor</h2>
+            <div class="tutorial-content">
+                <div class="tutorial-step active" data-step="1">
+                    <h3>Objective</h3>
+                    <p>Be the first player to reach the opposite side of the board!</p>
+                    <div class="tutorial-visual">
+                        <div class="mini-board">
+                            <div class="goal-line top">Player 2's Goal</div>
+                            <div class="mini-pawn p1" style="bottom: 10px;"></div>
+                            <div class="mini-pawn p2" style="top: 10px;"></div>
+                            <div class="goal-line bottom">Player 1's Goal</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="tutorial-step" data-step="2">
+                    <h3>Moving Your Pawn</h3>
+                    <p>Move one square at a time in any direction (up, down, left, right).</p>
+                    <p>You can jump over your opponent if they're adjacent and there's space behind them.</p>
+                </div>
+                <div class="tutorial-step" data-step="3">
+                    <h3>Placing Walls</h3>
+                    <p>Each player starts with 10 walls. Walls block movement but cannot completely block a player's path to their goal.</p>
+                    <p>Press R to rotate walls before placing them.</p>
+                </div>
+                <div class="tutorial-step" data-step="4">
+                    <h3>Strategy Tips</h3>
+                    <p>• Use walls to slow down your opponent</p>
+                    <p>• Save some walls for defense</p>
+                    <p>• Plan your path carefully</p>
+                    <p>• Watch for jumping opportunities</p>
+                </div>
+            </div>
+            <div class="tutorial-navigation">
+                <button class="nav-btn" id="prevStep" onclick="previousTutorialStep()">← Previous</button>
+                <div class="step-indicators" id="stepIndicators"></div>
+                <button class="nav-btn" id="nextStep" onclick="nextTutorialStep()">Next →</button>
+            </div>
+            <button class="close-btn" onclick="closeTutorial()">×</button>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal">
+        <div class="modal-content">
+            <h2>Settings</h2>
+            <div class="settings-content">
+                <div class="setting-group">
+                    <label>Sound Effects</label>
+                    <div class="toggle-switch">
+                        <input type="checkbox" id="soundToggle" checked>
+                        <span class="slider"></span>
+                    </div>
+                </div>
+                <div class="setting-group">
+                    <label>Background Music</label>
+                    <div class="toggle-switch">
+                        <input type="checkbox" id="musicToggle" checked>
+                        <span class="slider"></span>
+                    </div>
+                </div>
+                <div class="setting-group">
+                    <label>Show Move Hints</label>
+                    <div class="toggle-switch">
+                        <input type="checkbox" id="hintsToggle" checked>
+                        <span class="slider"></span>
+                    </div>
+                </div>
+                <div class="setting-group">
+                    <label>Animation Speed</label>
+                    <select id="animationSpeed">
+                        <option value="slow">Slow</option>
+                        <option value="normal" selected>Normal</option>
+                        <option value="fast">Fast</option>
+                    </select>
+                </div>
+                <div class="setting-group">
+                    <label>Board Theme</label>
+                    <select id="boardTheme">
+                        <option value="classic" selected>Classic</option>
+                        <option value="modern">Modern</option>
+                        <option value="neon">Neon</option>
+                        <option value="wood">Wood</option>
+                    </select>
+                </div>
+            </div>
+            <button class="close-btn" onclick="closeSettings()">×</button>
+        </div>
+    </div>
+
+    <!-- Statistics Modal -->
+    <div id="statsModal" class="modal">
+        <div class="modal-content">
+            <h2>Your Statistics</h2>
+            <div class="stats-content">
+                <div class="stat-card">
+                    <div class="stat-number" id="totalGames">0</div>
+                    <div class="stat-label">Total Games</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="gamesWon">0</div>
+                    <div class="stat-label">Games Won</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="winRate">0%</div>
+                    <div class="stat-label">Win Rate</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="avgMoves">0</div>
+                    <div class="stat-label">Avg Moves</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="bestTime">--:--</div>
+                    <div class="stat-label">Best Time</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="totalPlayTime">0h 0m</div>
+                    <div class="stat-label">Total Play Time</div>
+                </div>
+            </div>
+            <button class="menu-btn" onclick="resetStats()">Reset Statistics</button>
+            <button class="close-btn" onclick="closeStats()">×</button>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toast" class="toast"></div>
+
+    <!-- Loading Screen -->
+    <div id="loadingScreen" class="loading-screen">
+        <div class="loading-content">
+            <div class="loading-spinner"></div>
+            <p id="loadingText">Loading...</p>
+        </div>
+    </div>
+
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script src="game.js"></script>
+    <script src="ai.js"></script>
+    <script src="ui.js"></script>
+    <script src="online.js"></script>
