@@ -3,33 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Quoridor - Wall Chess Master</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <title>Quoridor - Wall Chess</title>
+    <script src="/socket.io/socket.io.js"></script>
     <style>
-        :root {
-            --primary-color: #6366f1;
-            --secondary-color: #8b5cf6;
-            --accent-color: #06d6a0;
-            --danger-color: #ef4444;
-            --warning-color: #f59e0b;
-            --success-color: #10b981;
-            
-            --bg-primary: #0f0f23;
-            --bg-secondary: #1a1a2e;
-            --bg-tertiary: #16213e;
-            
-            --text-primary: #ffffff;
-            --text-secondary: #a1a1aa;
-            --text-muted: #71717a;
-            
-            --glass-bg: rgba(255, 255, 255, 0.1);
-            --glass-border: rgba(255, 255, 255, 0.2);
-            
-            --border-radius: 12px;
-            --cell-size: 60px;
-            --wall-thickness: 8px;
-        }
-
         * {
             margin: 0;
             padding: 0;
@@ -37,204 +13,106 @@
         }
 
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-family: 'Arial', sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: var(--text-primary);
-            overflow-x: hidden;
             min-height: 100vh;
+            color: white;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
         }
 
         .screen {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            opacity: 0;
-            visibility: hidden;
-            transition: all 0.3s ease-in-out;
-            z-index: 1;
+            display: none;
+            text-align: center;
         }
 
         .screen.active {
-            opacity: 1;
-            visibility: visible;
-            z-index: 10;
+            display: block;
+        }
+
+        .title {
+            font-size: 3rem;
+            font-weight: bold;
+            margin-bottom: 2rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
         }
 
         .menu-container {
-            background: var(--glass-bg);
-            backdrop-filter: blur(20px);
-            border: 1px solid var(--glass-border);
-            border-radius: var(--border-radius);
-            padding: 3rem;
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
-            text-align: center;
-            max-width: 600px;
-            width: 90%;
-        }
-
-        .game-title {
-            margin-bottom: 2rem;
-        }
-
-        .title-main {
-            display: block;
-            font-size: 4rem;
-            font-weight: 800;
-            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            margin-bottom: 0.5rem;
-        }
-
-        .title-sub {
-            display: block;
-            font-size: 1.2rem;
-            font-weight: 300;
-            color: var(--text-secondary);
-            letter-spacing: 0.1em;
-        }
-
-        .menu-options {
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
-        }
-
-        .menu-btn {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 1rem;
-            padding: 1rem 2rem;
-            background: var(--glass-bg);
-            border: 1px solid var(--glass-border);
-            border-radius: var(--border-radius);
-            color: var(--text-primary);
-            font-size: 1.1rem;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.15s ease;
+            background: rgba(255, 255, 255, 0.1);
             backdrop-filter: blur(10px);
-            text-decoration: none;
+            border-radius: 20px;
+            padding: 2rem;
+            margin: 2rem auto;
+            max-width: 500px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
         }
 
-        .menu-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-            background: rgba(255, 255, 255, 0.15);
-        }
-
-        .menu-btn.primary {
-            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+        .btn {
+            background: linear-gradient(45deg, #667eea, #764ba2);
             border: none;
             color: white;
-        }
-
-        .menu-btn.primary:hover {
-            background: linear-gradient(135deg, #5855eb, #7c3aed);
-            box-shadow: 0 10px 25px rgba(99, 102, 241, 0.4);
-        }
-
-        .game-modes {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1.5rem;
-            margin-bottom: 2rem;
-        }
-
-        .mode-card {
-            background: var(--glass-bg);
-            border: 1px solid var(--glass-border);
-            border-radius: var(--border-radius);
-            padding: 2rem;
+            padding: 15px 30px;
+            margin: 10px;
+            border-radius: 10px;
             cursor: pointer;
-            transition: all 0.15s ease;
-            backdrop-filter: blur(10px);
-            text-align: center;
+            font-size: 1.1rem;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            min-width: 200px;
         }
 
-        .mode-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
-            background: rgba(255, 255, 255, 0.15);
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
         }
 
-        .mode-icon {
-            font-size: 3rem;
-            margin-bottom: 1rem;
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
         }
 
-        .mode-card h3 {
-            font-size: 1.3rem;
-            font-weight: 600;
-            margin-bottom: 0.5rem;
-            color: var(--text-primary);
+        .input-group {
+            margin: 15px 0;
+            text-align: left;
         }
 
-        .mode-card p {
-            color: var(--text-secondary);
-            font-size: 0.9rem;
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
         }
 
-        .back-btn {
-            background: transparent;
-            border: 1px solid var(--glass-border);
-            color: var(--text-secondary);
-            padding: 0.75rem 1.5rem;
-            border-radius: var(--border-radius);
-            cursor: pointer;
-            transition: all 0.15s ease;
+        .input-group input {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.9);
+            color: #333;
             font-size: 1rem;
-        }
-
-        .back-btn:hover {
-            background: var(--glass-bg);
-            color: var(--text-primary);
-            transform: translateX(-2px);
-        }
-
-        .screen-title {
-            font-size: 2.5rem;
-            font-weight: 700;
-            margin-bottom: 2rem;
-            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-
-        #gameScreen {
-            flex-direction: column;
-            padding: 1rem;
-            align-items: stretch;
-            justify-content: flex-start;
         }
 
         .game-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            background: var(--glass-bg);
-            backdrop-filter: blur(20px);
-            border: 1px solid var(--glass-border);
-            border-radius: var(--border-radius);
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
             padding: 1rem 2rem;
-            margin-bottom: 1rem;
+            margin-bottom: 2rem;
             flex-wrap: wrap;
             gap: 1rem;
-        }
-
-        .game-info {
-            display: flex;
-            align-items: center;
-            gap: 2rem;
-            flex: 1;
         }
 
         .player-info {
@@ -247,61 +125,32 @@
             width: 50px;
             height: 50px;
             border-radius: 50%;
-            border: 3px solid;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.5rem;
             font-weight: bold;
-            position: relative;
+            font-size: 1.2rem;
+            border: 3px solid;
         }
 
         .player-avatar.p1 {
-            background: linear-gradient(135deg, var(--danger-color), #dc2626);
-            border-color: var(--danger-color);
-            color: white;
+            background: #ff6b6b;
+            border-color: #ff5252;
         }
 
         .player-avatar.p2 {
-            background: linear-gradient(135deg, var(--success-color), #059669);
-            border-color: var(--success-color);
-            color: white;
+            background: #4ecdc4;
+            border-color: #26a69a;
         }
 
-        .player-avatar.active::after {
-            content: '';
-            position: absolute;
-            top: -5px;
-            left: -5px;
-            right: -5px;
-            bottom: -5px;
-            border: 2px solid var(--accent-color);
-            border-radius: 50%;
-            animation: pulse 1.5s ease-in-out infinite;
+        .player-avatar.active {
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.8);
+            animation: pulse 1.5s infinite;
         }
 
         @keyframes pulse {
-            0%, 100% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.05); opacity: 0.7; }
-        }
-
-        .player-details {
-            display: flex;
-            flex-direction: column;
-            gap: 0.25rem;
-        }
-
-        .player-name {
-            font-weight: 600;
-            font-size: 1.1rem;
-        }
-
-        .walls-count {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            color: var(--text-secondary);
-            font-size: 0.9rem;
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
         }
 
         .game-status {
@@ -310,42 +159,34 @@
         }
 
         .turn-indicator {
-            font-size: 1.2rem;
-            font-weight: 600;
+            font-size: 1.3rem;
+            font-weight: bold;
             margin-bottom: 0.5rem;
-            color: var(--accent-color);
-        }
-
-        .game-timer {
-            font-size: 1rem;
-            color: var(--text-secondary);
-            font-family: 'Courier New', monospace;
         }
 
         .game-controls {
             display: flex;
-            gap: 0.5rem;
+            gap: 10px;
             flex-wrap: wrap;
         }
 
         .control-btn {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding: 0.75rem 1rem;
-            background: var(--glass-bg);
-            border: 1px solid var(--glass-border);
-            border-radius: var(--border-radius);
-            color: var(--text-primary);
-            font-size: 0.9rem;
+            padding: 10px 20px;
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 8px;
+            color: white;
             cursor: pointer;
-            transition: all 0.15s ease;
-            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
         }
 
         .control-btn:hover:not(:disabled) {
-            background: rgba(255, 255, 255, 0.15);
-            transform: translateY(-1px);
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .control-btn.active {
+            background: #4ecdc4;
+            border-color: #26a69a;
         }
 
         .control-btn:disabled {
@@ -353,43 +194,35 @@
             cursor: not-allowed;
         }
 
-        .control-btn.active {
-            background: var(--primary-color);
-            border-color: var(--primary-color);
-            color: white;
-        }
-
         .game-board-container {
-            flex: 1;
             display: flex;
             justify-content: center;
             align-items: center;
-            padding: 1rem;
+            min-height: 600px;
         }
 
         .board-wrapper {
             position: relative;
-            background: var(--bg-secondary);
-            border-radius: var(--border-radius);
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
             padding: 2rem;
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
-            border: 1px solid var(--glass-border);
+            border: 1px solid rgba(255, 255, 255, 0.2);
         }
 
         .game-board {
             display: grid;
-            grid-template-columns: repeat(9, var(--cell-size));
-            grid-template-rows: repeat(9, var(--cell-size));
-            gap: 4px;
+            grid-template-columns: repeat(9, 60px);
+            grid-template-rows: repeat(9, 60px);
+            gap: 8px;
             position: relative;
-            z-index: 2;
         }
 
         .cell {
-            background: linear-gradient(135deg, #f8fafc, #e2e8f0);
+            background: rgba(255, 255, 255, 0.8);
             border-radius: 8px;
             cursor: pointer;
-            transition: all 0.15s ease;
+            transition: all 0.3s ease;
             position: relative;
             display: flex;
             align-items: center;
@@ -398,20 +231,25 @@
         }
 
         .cell:hover {
-            background: linear-gradient(135deg, #ddd6fe, #c4b5fd);
+            background: rgba(255, 255, 255, 0.9);
             transform: scale(1.05);
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         }
 
         .cell.valid-move {
-            background: linear-gradient(135deg, #dcfce7, #bbf7d0);
-            border-color: var(--success-color);
-            animation: validMovePulse 1.5s ease-in-out infinite;
+            background: rgba(76, 175, 80, 0.7);
+            border-color: #4caf50;
+            animation: validMove 1.5s infinite;
         }
 
-        @keyframes validMovePulse {
-            0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
-            50% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+        .cell.valid-jump {
+            background: rgba(255, 193, 7, 0.7);
+            border-color: #ffc107;
+            animation: validMove 1.5s infinite;
+        }
+
+        @keyframes validMove {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.4); }
+            50% { box-shadow: 0 0 0 10px rgba(76, 175, 80, 0); }
         }
 
         .pawn {
@@ -423,23 +261,22 @@
             left: 50%;
             transform: translate(-50%, -50%);
             border: 3px solid white;
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-            transition: all 0.3s ease;
-            z-index: 10;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.2rem;
             font-weight: bold;
+            font-size: 1.2rem;
             color: white;
+            z-index: 10;
         }
 
         .pawn.p1 {
-            background: linear-gradient(135deg, var(--danger-color), #dc2626);
+            background: #ff6b6b;
         }
 
         .pawn.p2 {
-            background: linear-gradient(135deg, var(--success-color), #059669);
+            background: #4ecdc4;
         }
 
         .walls-layer {
@@ -449,743 +286,439 @@
             width: 100%;
             height: 100%;
             pointer-events: none;
-            z-index: 1;
+            z-index: 5;
         }
 
         .wall {
             position: absolute;
-            background: linear-gradient(135deg, var(--secondary-color), #7c3aed);
+            background: linear-gradient(45deg, #8e44ad, #9b59b6);
             border-radius: 4px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-            transition: all 0.15s ease;
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            z-index: 6;
         }
 
         .wall.horizontal {
-            height: var(--wall-thickness);
-            width: calc(var(--cell-size) * 2 + 4px);
+            height: 8px;
+            width: 128px; /* 2 cells + gap */
         }
 
         .wall.vertical {
-            width: var(--wall-thickness);
-            height: calc(var(--cell-size) * 2 + 4px);
+            width: 8px;
+            height: 128px; /* 2 cells + gap */
         }
 
         .wall.preview {
             opacity: 0.6;
             pointer-events: auto;
             cursor: pointer;
-            animation: wallPreview 1.5s ease-in-out infinite;
+            animation: wallPreview 1.5s infinite;
+        }
+
+        .wall.preview:hover {
+            opacity: 0.8;
+            transform: scale(1.1);
         }
 
         @keyframes wallPreview {
-            0%, 100% { box-shadow: 0 0 10px rgba(139, 92, 246, 0.5); }
-            50% { box-shadow: 0 0 20px rgba(139, 92, 246, 0.8); }
-        }
-
-        .online-options {
-            margin-bottom: 2rem;
-        }
-
-        .input-group {
-            margin-bottom: 1.5rem;
-            text-align: left;
-        }
-
-        .input-group label {
-            display: block;
-            margin-bottom: 0.5rem;
-            font-weight: 500;
-            color: var(--text-secondary);
-        }
-
-        .input-group input {
-            width: 100%;
-            padding: 1rem;
-            background: var(--glass-bg);
-            border: 1px solid var(--glass-border);
-            border-radius: var(--border-radius);
-            color: var(--text-primary);
-            font-size: 1rem;
-            backdrop-filter: blur(10px);
-        }
-
-        .input-group input:focus {
-            outline: none;
-            border-color: var(--primary-color);
-            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
-        }
-
-        .online-buttons {
-            display: flex;
-            gap: 1rem;
-            flex-wrap: wrap;
-        }
-
-        .online-buttons .menu-btn {
-            flex: 1;
-            min-width: 200px;
-        }
-
-        .toast {
-            position: fixed;
-            top: 2rem;
-            right: 2rem;
-            background: var(--glass-bg);
-            backdrop-filter: blur(20px);
-            border: 1px solid var(--glass-border);
-            border-radius: var(--border-radius);
-            padding: 1rem 1.5rem;
-            color: var(--text-primary);
-            font-weight: 500;
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-            transform: translateX(400px);
-            transition: all 0.3s ease;
-            z-index: 2000;
-            max-width: 300px;
-        }
-
-        .toast.show {
-            transform: translateX(0);
-        }
-
-        .toast.success {
-            border-left: 4px solid var(--success-color);
-        }
-
-        .toast.error {
-            border-left: 4px solid var(--danger-color);
-        }
-
-        .toast.info {
-            border-left: 4px solid var(--primary-color);
+            0%, 100% { box-shadow: 0 0 10px rgba(142, 68, 173, 0.5); }
+            50% { box-shadow: 0 0 20px rgba(142, 68, 173, 0.8); }
         }
 
         .connection-status {
             position: fixed;
-            top: 1rem;
-            left: 1rem;
-            padding: 0.5rem 1rem;
-            border-radius: var(--border-radius);
+            top: 20px;
+            right: 20px;
+            padding: 10px 15px;
+            border-radius: 20px;
             font-size: 0.9rem;
-            font-weight: 500;
+            font-weight: bold;
             z-index: 1000;
         }
 
         .connection-status.connected {
-            background: var(--success-color);
+            background: rgba(76, 175, 80, 0.9);
             color: white;
         }
 
         .connection-status.disconnected {
-            background: var(--danger-color);
+            background: rgba(244, 67, 54, 0.9);
             color: white;
         }
 
+        .connection-status.connecting {
+            background: rgba(255, 193, 7, 0.9);
+            color: black;
+        }
+
+        .room-code-display {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            font-size: 1.2rem;
+            font-weight: bold;
+            letter-spacing: 2px;
+        }
+
+        .toast {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 15px 25px;
+            border-radius: 25px;
+            font-weight: bold;
+            z-index: 2000;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .toast.show {
+            opacity: 1;
+        }
+
+        .toast.success {
+            background: rgba(76, 175, 80, 0.9);
+        }
+
+        .toast.error {
+            background: rgba(244, 67, 54, 0.9);
+        }
+
+        .toast.info {
+            background: rgba(33, 150, 243, 0.9);
+        }
+
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 3000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .modal.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal-content {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 2rem;
+            max-width: 500px;
+            width: 90%;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .difficulty-options {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .difficulty-btn {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            border: none;
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 1.1rem;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+
+        .difficulty-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+
+        .difficulty-btn.easy {
+            background: linear-gradient(45deg, #4caf50, #45a049);
+        }
+
+        .difficulty-btn.medium {
+            background: linear-gradient(45deg, #ff9800, #f57c00);
+        }
+
+        .difficulty-btn.hard {
+            background: linear-gradient(45deg, #f44336, #d32f2f);
+        }
+
         @media (max-width: 768px) {
-            :root {
-                --cell-size: 45px;
-                --wall-thickness: 6px;
+            .game-board {
+                grid-template-columns: repeat(9, 45px);
+                grid-template-rows: repeat(9, 45px);
+                gap: 6px;
             }
-            
-            .menu-container {
-                padding: 2rem;
-                margin: 1rem;
+
+            .wall.horizontal {
+                width: 96px;
             }
-            
-            .title-main {
-                font-size: 3rem;
+
+            .wall.vertical {
+                height: 96px;
             }
-            
-            .game-modes {
-                grid-template-columns: 1fr;
+
+            .game-header {
+                flex-direction: column;
+                text-align: center;
             }
-            
-            .board-wrapper {
-                padding: 1rem;
-            }
-            
-            .game-controls {
-                gap: 0.25rem;
-            }
-            
-            .control-btn {
-                padding: 0.5rem 0.75rem;
-                font-size: 0.8rem;
+
+            .title {
+                font-size: 2rem;
             }
         }
     </style>
 </head>
 <body>
-    <!-- Connection Status -->
-    <div id="connectionStatus" class="connection-status disconnected">Disconnected</div>
+    <div class="container">
+        <!-- Connection Status -->
+        <div id="connectionStatus" class="connection-status disconnected">Offline</div>
 
-    <!-- Main Menu -->
-    <div id="mainMenu" class="screen active">
-        <div class="menu-container">
-            <div class="game-title">
-                <span class="title-main">QUORIDOR</span>
-                <span class="title-sub">Wall Chess Master</span>
-            </div>
-            
-            <div class="menu-options">
-                <button class="menu-btn primary" onclick="showGameModes()">
-                    <span>🎮</span>
-                    <span>Play Game</span>
-                </button>
+        <!-- Toast Notification -->
+        <div id="toast" class="toast"></div>
+
+        <!-- Main Menu Screen -->
+        <div id="mainMenu" class="screen active">
+            <h1 class="title">Quoridor</h1>
+            <div class="menu-container">
+                <h2>Choose Game Mode</h2>
+                <button class="btn" onclick="showAIMenu()">🤖 Play vs Computer</button>
+                <button class="btn" onclick="startLocalGame()">👥 Local Multiplayer</button>
+                <button class="btn" onclick="showOnlineMenu()">🌐 Online Multiplayer</button>
+                <button class="btn" onclick="showRules()">📖 How to Play</button>
             </div>
         </div>
-    </div>
 
-    <!-- Game Mode Selection -->
-    <div id="gameModeMenu" class="screen">
-        <div class="menu-container">
-            <h2 class="screen-title">Choose Game Mode</h2>
-            <div class="game-modes">
-                <div class="mode-card" onclick="startLocalGame()">
-                    <div class="mode-icon">👥</div>
-                    <h3>Local Multiplayer</h3>
-                    <p>Play with a friend on the same device</p>
+        <!-- AI Difficulty Menu -->
+        <div id="aiMenu" class="screen">
+            <h1 class="title">Choose Difficulty</h1>
+            <div class="menu-container">
+                <div class="difficulty-options">
+                    <button class="difficulty-btn easy" onclick="startAIGame('easy')">
+                        🟢 Easy<br><small>Good for beginners</small>
+                    </button>
+                    <button class="difficulty-btn medium" onclick="startAIGame('medium')">
+                        🟡 Medium<br><small>Balanced challenge</small>
+                    </button>
+                    <button class="difficulty-btn hard" onclick="startAIGame('hard')">
+                        🔴 Hard<br><small>Expert level</small>
+                    </button>
                 </div>
-                <div class="mode-card" onclick="showOnlineMenu()">
-                    <div class="mode-icon">🌐</div>
-                    <h3>Online Multiplayer</h3>
-                    <p>Play with players worldwide</p>
-                </div>
+                <button class="btn" onclick="showMainMenu()">← Back</button>
             </div>
-            <button class="back-btn" onclick="showMainMenu()">← Back</button>
         </div>
-    </div>
 
-    <!-- Online Menu -->
-    <div id="onlineMenu" class="screen">
-        <div class="menu-container">
-            <h2 class="screen-title">Online Multiplayer</h2>
-            <div class="online-options">
+        <!-- Online Menu Screen -->
+        <div id="onlineMenu" class="screen">
+            <h1 class="title">Online Multiplayer</h1>
+            <div class="menu-container">
                 <div class="input-group">
-                    <label for="playerName">Your Name</label>
-                    <input type="text" id="playerName" placeholder="Enter your name" maxlength="20" value="Player">
+                    <label for="playerName">Your Name:</label>
+                    <input type="text" id="playerName" placeholder="Enter your name" maxlength="20">
                 </div>
                 <div class="input-group">
-                    <label for="roomCode">Room Code (Optional)</label>
-                    <input type="text" id="roomCode" placeholder="Enter room code or leave empty" maxlength="8">
+                    <label for="roomCode">Room Code (optional):</label>
+                    <input type="text" id="roomCode" placeholder="Leave empty to create new room" maxlength="6">
                 </div>
-                <div class="online-buttons">
-                    <button class="menu-btn primary" onclick="joinOnlineGame()">Join/Create Game</button>
-                </div>
+                <button class="btn" onclick="joinOnlineGame()">🚀 Join Game</button>
+                <button class="btn" onclick="showMainMenu()">← Back</button>
             </div>
-            <button class="back-btn" onclick="showGameModes()">← Back</button>
         </div>
-    </div>
 
-    <!-- Game Screen -->
-    <div id="gameScreen" class="screen">
-        <div class="game-header">
-            <div class="game-info">
-                <div class="player-info" id="player1Info">
-                    <div class="player-avatar p1">1</div>
-                    <div class="player-details">
-                        <span class="player-name" id="player1Name">Player 1</span>
-                        <div class="walls-count">
-                            <span>🧱</span>
-                            <span id="player1Walls">10</span>
-                        </div>
+        <!-- Game Screen -->
+        <div id="gameScreen" class="screen">
+            <!-- Game Header -->
+            <div class="game-header">
+                <div class="player-info">
+                    <div class="player-avatar p1" id="player1Avatar">1</div>
+                    <div>
+                        <div id="player1Name">Player 1</div>
+                        <div>Walls: <span id="player1Walls">10</span></div>
                     </div>
                 </div>
-                
+
                 <div class="game-status">
                     <div class="turn-indicator" id="turnIndicator">Player 1's Turn</div>
-                    <div class="game-timer" id="gameTimer">00:00</div>
+                    <div id="roomCodeDisplay" class="room-code-display" style="display: none;"></div>
                 </div>
-                
-                <div class="player-info" id="player2Info">
-                    <div class="player-details">
-                        <span class="player-name" id="player2Name">Player 2</span>
-                        <div class="walls-count">
-                            <span>🧱</span>
-                            <span id="player2Walls">10</span>
-                        </div>
+
+                <div class="player-info">
+                    <div class="player-avatar p2" id="player2Avatar">2</div>
+                    <div>
+                        <div id="player2Name">Player 2</div>
+                        <div>Walls: <span id="player2Walls">10</span></div>
                     </div>
-                    <div class="player-avatar p2">2</div>
                 </div>
             </div>
-            
+
+            <!-- Game Controls -->
             <div class="game-controls">
-                <button class="control-btn" id="moveBtn" onclick="setAction('move')">
-                    <span>🚶</span>
-                    Move
-                </button>
-                <button class="control-btn" id="wallBtn" onclick="setAction('wall')">
-                    <span>🧱</span>
-                    Wall
-                </button>
-                <button class="control-btn" onclick="quitGame()">
-                    <span>🏠</span>
-                    Menu
-                </button>
+                <button class="control-btn" id="moveBtn" onclick="setAction('move')">🚶 Move</button>
+                <button class="control-btn" id="wallBtn" onclick="setAction('wall')">🧱 Wall</button>
+                <button class="control-btn" onclick="showMainMenu()">🏠 Menu</button>
+            </div>
+
+            <!-- Game Board -->
+            <div class="game-board-container">
+                <div class="board-wrapper">
+                    <div class="game-board" id="gameBoard"></div>
+                    <div class="walls-layer" id="wallsLayer"></div>
+                </div>
             </div>
         </div>
 
-        <div class="game-board-container">
-            <div class="board-wrapper">
-                <div id="gameBoard" class="game-board"></div>
-                <div id="wallsLayer" class="walls-layer"></div>
+        <!-- Rules Modal -->
+        <div id="rulesModal" class="modal">
+            <div class="modal-content">
+                <h2>How to Play Quoridor</h2>
+                <div style="text-align: left; margin: 20px 0;">
+                    <h3>🎯 Objective:</h3>
+                    <p>• Player 1 (Red) must reach the bottom row</p>
+                    <p>• Player 2 (Green) must reach the top row</p>
+                    
+                    <h3>🚶 Movement:</h3>
+                    <p>• Move one square in any direction (up, down, left, right)</p>
+                    <p>• Jump over opponent if they're adjacent</p>
+                    <p>• Make diagonal jumps when straight jump is blocked</p>
+                    
+                    <h3>🧱 Walls:</h3>
+                    <p>• Each player starts with 10 walls</p>
+                    <p>• Walls block movement between squares</p>
+                    <p>• Cannot completely block opponent's path to goal</p>
+                    <p>• Walls span 2 squares and can be horizontal or vertical</p>
+                    
+                    <h3>🎮 Controls:</h3>
+                    <p>• Click "Move" then click a highlighted square</p>
+                    <p>• Click "Wall" then click a wall preview to place it</p>
+                </div>
+                <button class="btn" onclick="hideRules()">Got it!</button>
+            </div>
+        </div>
+
+        <!-- Game Over Modal -->
+        <div id="gameOverModal" class="modal">
+            <div class="modal-content">
+                <h2 id="gameOverTitle">Game Over</h2>
+                <p id="gameOverMessage"></p>
+                <div style="margin: 20px 0;">
+                    <button class="btn" onclick="restartGame()">🔄 Play Again</button>
+                    <button class="btn" onclick="showMainMenu()">🏠 Main Menu</button>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- Toast Notifications -->
-    <div id="toast" class="toast"></div>
-
-    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <script>
         // Game State
-        class GameState {
-            constructor() {
-                this.board = this.initializeBoard();
-                this.players = [
-                    { id: 0, name: 'Player 1', position: { x: 4, y: 0 }, walls: 10 },
-                    { id: 1, name: 'Player 2', position: { x: 4, y: 8 }, walls: 10 }
-                ];
-                this.currentPlayer = 0;
-                this.gameStatus = 'waiting';
-                this.currentAction = null;
-                this.isOnline = false;
-                this.myPlayerId = null;
-                this.roomCode = null;
-                this.startTime = null;
-                this.timerInterval = null;
-            }
-
-            initializeBoard() {
-                return {
-                    horizontalWalls: Array(8).fill().map(() => Array(9).fill(false)),
-                    verticalWalls: Array(9).fill().map(() => Array(8).fill(false))
-                };
-            }
-
-            startGame(isOnline = false) {
-                this.gameStatus = 'playing';
-                this.startTime = Date.now();
-                this.isOnline = isOnline;
-                this.startTimer();
-                this.updateUI();
-            }
-
-            startTimer() {
-                this.timerInterval = setInterval(() => {
-                    if (this.gameStatus === 'playing') {
-                        const elapsed = Date.now() - this.startTime;
-                        const minutes = Math.floor(elapsed / 60000);
-                        const seconds = Math.floor((elapsed % 60000) / 1000);
-                        const timeString = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-                        document.getElementById('gameTimer').textContent = timeString;
-                    }
-                }, 1000);
-            }
-
-            stopTimer() {
-                if (this.timerInterval) {
-                    clearInterval(this.timerInterval);
-                    this.timerInterval = null;
-                }
-            }
-
-            makeMove(playerId, position) {
-                if (this.gameStatus !== 'playing') return false;
-                if (this.isOnline && playerId !== this.myPlayerId) return false;
-                if (!this.isOnline && this.currentPlayer !== playerId) return false;
-
-                if (!this.isValidMove(this.players[playerId].position, position)) {
-                    showToast('Invalid move!', 'error');
-                    return false;
-                }
-
-                if (this.isOnline) {
-                    socket.emit('movePawn', {
-                        roomCode: this.roomCode,
-                        playerId: playerId,
-                        position: position
-                    });
-                } else {
-                    this.executeMove(playerId, position);
-                }
-                return true;
-            }
-
-            executeMove(playerId, position) {
-                this.players[playerId].position = position;
-                
-                if (this.checkWinCondition(playerId)) {
-                    this.endGame(playerId);
-                    return;
-                }
-
-                this.currentPlayer = (this.currentPlayer + 1) % 2;
-                this.currentAction = null;
-                this.updateUI();
-            }
-
-            placeWall(playerId, wall) {
-                if (this.gameStatus !== 'playing') return false;
-                if (this.isOnline && playerId !== this.myPlayerId) return false;
-                if (!this.isOnline && this.currentPlayer !== playerId) return false;
-
-                if (this.players[playerId].walls <= 0) {
-                    showToast('No walls remaining!', 'error');
-                    return false;
-                }
-
-                if (!this.isValidWallPlacement(wall)) {
-                    showToast('Invalid wall placement!', 'error');
-                    return false;
-                }
-
-                if (this.isOnline) {
-                    socket.emit('placeWall', {
-                        roomCode: this.roomCode,
-                        playerId: playerId,
-                        wall: wall
-                    });
-                } else {
-                    this.executeWallPlacement(playerId, wall);
-                }
-                return true;
-            }
-
-            executeWallPlacement(playerId, wall) {
-                this.placeWallOnBoard(wall);
-                this.players[playerId].walls--;
-                this.currentPlayer = (this.currentPlayer + 1) % 2;
-                this.currentAction = null;
-                this.updateUI();
-            }
-
-            isValidMove(from, to) {
-                if (to.x < 0 || to.x > 8 || to.y < 0 || to.y > 8) return false;
-                if (this.isCellOccupied(to)) return false;
-
-                const dx = Math.abs(to.x - from.x);
-                const dy = Math.abs(to.y - from.y);
-
-                if ((dx === 1 && dy === 0) || (dx === 0 && dy === 1)) {
-                    return !this.isWallBetween(from, to);
-                }
-
-                if ((dx === 2 && dy === 0) || (dx === 0 && dy === 2)) {
-                    const midPoint = {
-                        x: from.x + (to.x - from.x) / 2,
-                        y: from.y + (to.y - from.y) / 2
-                    };
-                    
-                    if (!this.isCellOccupied(midPoint)) return false;
-                    return !this.isWallBetween(from, midPoint) && !this.isWallBetween(midPoint, to);
-                }
-
-                if (dx === 1 && dy === 1) {
-                    const opponentPos = this.findOpponentAdjacentTo(from);
-                    if (!opponentPos) return false;
-                    
-                    const straightJump = {
-                        x: from.x + (opponentPos.x - from.x) * 2,
-                        y: from.y + (opponentPos.y - from.y) * 2
-                    };
-                    
-                    if (straightJump.x >= 0 && straightJump.x <= 8 && 
-                        straightJump.y >= 0 && straightJump.y <= 8 && 
-                        !this.isCellOccupied(straightJump) && 
-                        !this.isWallBetween(opponentPos, straightJump)) {
-                        return false;
-                    }
-                    
-                    return !this.isWallBetween(from, opponentPos) && !this.isWallBetween(opponentPos, to);
-                }
-
-                return false;
-            }
-
-            isValidWallPlacement(wall) {
-                const { x, y, orientation } = wall;
-
-                if (orientation === 'horizontal') {
-                    if (x < 0 || x > 7 || y < 1 || y > 8) return false;
-                    if (this.board.horizontalWalls[x][y] || this.board.horizontalWalls[x + 1][y]) return false;
-                } else {
-                    if (x < 1 || x > 8 || y < 0 || y > 7) return false;
-                    if (this.board.verticalWalls[x][y] || this.board.verticalWalls[x][y + 1]) return false;
-                }
-
-                if (orientation === 'horizontal' && y > 0 && y < 8) {
-                    if (this.board.verticalWalls[x + 1][y - 1] && this.board.verticalWalls[x + 1][y]) return false;
-                } else if (orientation === 'vertical' && x > 0 && x < 8) {
-                    if (this.board.horizontalWalls[x - 1][y + 1] && this.board.horizontalWalls[x][y + 1]) return false;
-                }
-
-                const tempBoard = JSON.parse(JSON.stringify(this.board));
-                this.placeWallOnTempBoard(tempBoard, wall);
-                
-                for (let player of this.players) {
-                    if (!this.hasPathToGoal(tempBoard, player.position, player.id)) {
-                        return false;
-                    }
-                }
-
-                return true;
-            }
-
-            placeWallOnBoard(wall) {
-                const { x, y, orientation } = wall;
-                
-                if (orientation === 'horizontal') {
-                    this.board.horizontalWalls[x][y] = true;
-                    this.board.horizontalWalls[x + 1][y] = true;
-                } else {
-                    this.board.verticalWalls[x][y] = true;
-                    this.board.verticalWalls[x][y + 1] = true;
-                }
-            }
-
-            placeWallOnTempBoard(board, wall) {
-                const { x, y, orientation } = wall;
-                
-                if (orientation === 'horizontal') {
-                    board.horizontalWalls[x][y] = true;
-                    board.horizontalWalls[x + 1][y] = true;
-                } else {
-                    board.verticalWalls[x][y] = true;
-                    board.verticalWalls[x][y + 1] = true;
-                }
-            }
-
-            isWallBetween(pos1, pos2) {
-                if (pos1.x === pos2.x) {
-                    const x = pos1.x;
-                    const minY = Math.min(pos1.y, pos2.y);
-                    return this.board.horizontalWalls[x][minY + 1];
-                } else if (pos1.y === pos2.y) {
-                    const y = pos1.y;
-                    const minX = Math.min(pos1.x, pos2.x);
-                    return this.board.verticalWalls[minX + 1][y];
-                }
-                return false;
-            }
-
-            isCellOccupied(pos) {
-                return this.players.some(player => 
-                    player.position.x === pos.x && player.position.y === pos.y
-                );
-            }
-
-            findOpponentAdjacentTo(pos) {
-                const directions = [
-                    { x: 0, y: 1 }, { x: 0, y: -1 },
-                    { x: 1, y: 0 }, { x: -1, y: 0 }
-                ];
-                
-                for (let dir of directions) {
-                    const checkPos = { x: pos.x + dir.x, y: pos.y + dir.y };
-                    if (this.isCellOccupied(checkPos)) {
-                        return checkPos;
-                    }
-                }
-                return null;
-            }
-
-            hasPathToGoal(board, position, playerId) {
-                const visited = Array(9).fill().map(() => Array(9).fill(false));
-                const queue = [position];
-                visited[position.x][position.y] = true;
-                
-                const goalY = playerId === 0 ? 8 : 0;
-                
-                while (queue.length > 0) {
-                    const pos = queue.shift();
-                    
-                    if (pos.y === goalY) return true;
-                    
-                    const directions = [
-                        { x: 0, y: 1 }, { x: 0, y: -1 },
-                        { x: 1, y: 0 }, { x: -1, y: 0 }
-                    ];
-                    
-                    for (let dir of directions) {
-                        const newPos = { x: pos.x + dir.x, y: pos.y + dir.y };
-                        
-                        if (newPos.x < 0 || newPos.x > 8 || newPos.y < 0 || newPos.y > 8) continue;
-                        if (visited[newPos.x][newPos.y]) continue;
-                        if (this.isWallBetweenOnBoard(board, pos, newPos)) continue;
-                        
-                        visited[newPos.x][newPos.y] = true;
-                        queue.push(newPos);
-                    }
-                }
-                
-                return false;
-            }
-
-            isWallBetweenOnBoard(board, pos1, pos2) {
-                if (pos1.x === pos2.x) {
-                    const x = pos1.x;
-                    const minY = Math.min(pos1.y, pos2.y);
-                    return board.horizontalWalls[x][minY + 1];
-                } else if (pos1.y === pos2.y) {
-                    const y = pos1.y;
-                    const minX = Math.min(pos1.x, pos2.x);
-                    return board.verticalWalls[minX + 1][y];
-                }
-                return false;
-            }
-
-            checkWinCondition(playerId) {
-                const player = this.players[playerId];
-                return (playerId === 0 && player.position.y === 8) || 
-                       (playerId === 1 && player.position.y === 0);
-            }
-
-            endGame(winner) {
-                this.gameStatus = 'finished';
-                this.stopTimer();
-                const winnerName = this.players[winner].name;
-                showToast(`${winnerName} wins!`, 'success', 5000);
-                
-                setTimeout(() => {
-                    if (confirm(`${winnerName} wins! Play again?`)) {
-                        if (this.isOnline) {
-                            // Reset for online game
-                            this.resetGame();
-                        } else {
-                            this.resetGame();
-                            this.startGame(false);
-                        }
-                    } else {
-                        showMainMenu();
-                    }
-                }, 2000);
-            }
-
-            resetGame() {
-                this.board = this.initializeBoard();
-                this.players[0].position = { x: 4, y: 0 };
-                this.players[1].position = { x: 4, y: 8 };
-                this.players[0].walls = 10;
-                this.players[1].walls = 10;
-                this.currentPlayer = 0;
-                this.currentAction = null;
-                this.stopTimer();
-            }
-
-            getValidMoves(playerId) {
-                const player = this.players[playerId];
-                const moves = [];
-                
-                for (let x = 0; x < 9; x++) {
-                    for (let y = 0; y < 9; y++) {
-                        const move = { x, y };
-                        if (this.isValidMove(player.position, move)) {
-                            moves.push(move);
-                        }
-                    }
-                }
-                
-                return moves;
-            }
-
-            getValidWallPlacements(playerId) {
-                const walls = [];
-                
-                for (let x = 0; x < 8; x++) {
-                    for (let y = 1; y < 9; y++) {
-                        const wall = { x, y, orientation: 'horizontal' };
-                        if (this.isValidWallPlacement(wall)) {
-                            walls.push(wall);
-                        }
-                    }
-                }
-                
-                for (let x = 1; x < 9; x++) {
-                    for (let y = 0; y < 8; y++) {
-                        const wall = { x, y, orientation: 'vertical' };
-                        if (this.isValidWallPlacement(wall)) {
-                            walls.push(wall);
-                        }
-                    }
-                }
-                
-                return walls;
-            }
-
-            updateUI() {
-                updatePlayerInfo();
-                updateBoard();
-                updateWalls();
-                updateTurnIndicator();
-                updateActionButtons();
-                
-                if (this.currentAction === 'move') {
-                    highlightValidMoves();
-                } else {
-                    clearHighlights();
-                }
-                
-                if (this.currentAction === 'wall') {
-                    showWallPreviews();
-                } else {
-                    clearWallPreviews();
-                }
-            }
-        }
-
-        // Initialize game
-        const game = new GameState();
-        let socket = null;
+        let gameState = {
+            mode: 'local', // 'local', 'ai', 'online'
+            currentPlayer: 0,
+            players: [
+                { name: 'Player 1', position: { x: 4, y: 0 }, walls: 10 },
+                { name: 'Player 2', position: { x: 4, y: 8 }, walls: 10 }
+            ],
+            board: {
+                horizontalWalls: Array(8).fill().map(() => Array(9).fill(false)),
+                verticalWalls: Array(9).fill().map(() => Array(8).fill(false))
+            },
+            currentAction: null,
+            gameOver: false,
+            aiDifficulty: 'medium'
+        };
 
         // Socket.IO connection
-        function connectToServer() {
-            socket = io('https://wall-chess.onrender.com');
-            
+        let socket = null;
+        let isOnline = false;
+        let playerId = null;
+        let roomCode = null;
+
+        // Initialize socket connection
+        function initSocket() {
+            if (socket) {
+                socket.disconnect();
+            }
+
+            socket = io('https://wall-chess.onrender.com', {
+                transports: ['websocket', 'polling'],
+                timeout: 20000,
+                forceNew: true
+            });
+
             socket.on('connect', () => {
-                document.getElementById('connectionStatus').textContent = 'Connected';
-                document.getElementById('connectionStatus').className = 'connection-status connected';
+                updateConnectionStatus('connected');
+                showToast('Connected to server!', 'success');
             });
 
             socket.on('disconnect', () => {
-                document.getElementById('connectionStatus').textContent = 'Disconnected';
-                document.getElementById('connectionStatus').className = 'connection-status disconnected';
+                updateConnectionStatus('disconnected');
+                showToast('Disconnected from server', 'error');
+            });
+
+            socket.on('connect_error', () => {
+                updateConnectionStatus('disconnected');
+                showToast('Failed to connect to server', 'error');
             });
 
             socket.on('roomJoined', (data) => {
-                game.roomCode = data.roomCode;
-                game.myPlayerId = data.playerId;
-                game.players[game.myPlayerId].name = document.getElementById('playerName').value || 'Player';
-                showToast(`Joined room: ${data.roomCode}`, 'success');
+                playerId = data.playerId;
+                roomCode = data.roomCode;
+                document.getElementById('roomCodeDisplay').textContent = `Room: ${roomCode}`;
+                document.getElementById('roomCodeDisplay').style.display = 'block';
+                showToast(`Joined room: ${roomCode}`, 'success');
                 
-                if (data.playerId === 1) {
-                    showToast('Waiting for game to start...', 'info');
+                if (playerId === 0) {
+                    showToast('Waiting for another player...', 'info');
                 }
             });
 
-            socket.on('gameStarted', (gameData) => {
-                game.players[0].name = gameData.players[0].name || 'Player 1';
-                game.players[1].name = gameData.players[1].name || 'Player 2';
-                game.startGame(true);
-                showScreen('gameScreen');
-                createBoard();
+            socket.on('gameStarted', (data) => {
+                gameState.players = data.players.map((p, i) => ({
+                    name: p.name,
+                    position: p.position,
+                    walls: p.walls
+                }));
+                gameState.currentPlayer = data.currentTurn;
+                gameState.gameOver = false;
+                updateUI();
                 showToast('Game started!', 'success');
             });
 
-            socket.on('gameUpdated', (gameData) => {
-                game.board = gameData.board;
-                game.players = gameData.players;
-                game.currentPlayer = gameData.currentTurn;
-                game.updateUI();
+            socket.on('gameUpdated', (data) => {
+                gameState.players = data.players.map((p, i) => ({
+                    ...gameState.players[i],
+                    position: p.position,
+                    walls: p.walls
+                }));
+                gameState.board = data.board;
+                gameState.currentPlayer = data.currentTurn;
+                updateUI();
             });
 
             socket.on('gameOver', (data) => {
-                game.endGame(data.winner);
+                gameState.gameOver = true;
+                const winner = gameState.players[data.winner];
+                showGameOver(winner.name);
             });
 
             socket.on('playerLeft', () => {
-                showToast('Opponent left the game', 'error');
+                showToast('Other player left the game', 'error');
                 setTimeout(() => showMainMenu(), 3000);
             });
 
@@ -1199,63 +732,119 @@
             document.querySelectorAll('.screen').forEach(screen => {
                 screen.classList.remove('active');
             });
+            document.getElementById(screenId).classList.add('active');
+        }
+
+        function showMainMenu() {
+            showScreen('mainMenu');
+            gameState.gameOver = false;
+            document.getElementById('roomCodeDisplay').style.display = 'none';
+            if (socket) {
+                socket.disconnect();
+            }
+            updateConnectionStatus('disconnected');
+        }
+
+        function showAIMenu() {
+            showScreen('aiMenu');
+        }
+
+        function showOnlineMenu() {
+            showScreen('onlineMenu');
+            updateConnectionStatus('connecting');
+            initSocket();
+        }
+
+        function showRules() {
+            document.getElementById('rulesModal').classList.add('active');
+        }
+
+        function hideRules() {
+            document.getElementById('rulesModal').classList.remove('active');
+        }
+
+        function updateConnectionStatus(status) {
+            const statusEl = document.getElementById('connectionStatus');
+            statusEl.className = `connection-status ${status}`;
             
-            const targetScreen = document.getElementById(screenId);
-            if (targetScreen) {
-                targetScreen.classList.add('active');
+            switch(status) {
+                case 'connected':
+                    statusEl.textContent = 'Online';
+                    break;
+                case 'connecting':
+                    statusEl.textContent = 'Connecting...';
+                    break;
+                default:
+                    statusEl.textContent = 'Offline';
             }
         }
 
         function showToast(message, type = 'info', duration = 3000) {
             const toast = document.getElementById('toast');
             toast.textContent = message;
-            toast.className = `toast ${type}`;
-            toast.classList.add('show');
+            toast.className = `toast ${type} show`;
             
             setTimeout(() => {
                 toast.classList.remove('show');
             }, duration);
         }
 
-        function showMainMenu() {
-            game.resetGame();
-            game.gameStatus = 'waiting';
-            game.isOnline = false;
-            showScreen('mainMenu');
-        }
-
-        function showGameModes() {
-            showScreen('gameModeMenu');
-        }
-
-        function showOnlineMenu() {
-            if (!socket) {
-                connectToServer();
-            }
-            showScreen('onlineMenu');
-        }
-
+        // Game Functions
         function startLocalGame() {
-            game.startGame(false);
+            gameState.mode = 'local';
+            gameState.currentPlayer = 0;
+            gameState.gameOver = false;
+            gameState.players = [
+                { name: 'Player 1', position: { x: 4, y: 0 }, walls: 10 },
+                { name: 'Player 2', position: { x: 4, y: 8 }, walls: 10 }
+            ];
+            resetBoard();
+            showScreen('gameScreen');
+            createBoard();
+            updateUI();
+        }
+
+        function startAIGame(difficulty) {
+            gameState.mode = 'ai';
+            gameState.aiDifficulty = difficulty;
+            gameState.currentPlayer = 0;
+            gameState.gameOver = false;
+            gameState.players = [
+                { name: 'You', position: { x: 4, y: 0 }, walls: 10 },
+                { name: `AI (${difficulty})`, position: { x: 4, y: 8 }, walls: 10 }
+            ];
+            resetBoard();
+            showScreen('gameScreen');
+            createBoard();
+            updateUI();
+        }
+
+        function joinOnlineGame() {
+            const playerName = document.getElementById('playerName').value.trim() || 'Anonymous';
+            const roomCodeInput = document.getElementById('roomCode').value.trim().toUpperCase();
+            
+            if (!socket || !socket.connected) {
+                showToast('Not connected to server', 'error');
+                return;
+            }
+
+            gameState.mode = 'online';
+            isOnline = true;
+            
+            socket.emit('joinRoom', {
+                playerName: playerName,
+                roomCode: roomCodeInput || null
+            });
+            
             showScreen('gameScreen');
             createBoard();
         }
 
-        function joinOnlineGame() {
-            const playerName = document.getElementById('playerName').value || 'Player';
-            const roomCode = document.getElementById('roomCode').value || Math.random().toString(36).substring(2, 8);
-            
-            if (!socket || !socket.connected) {
-                showToast('Connecting to server...', 'info');
-                connectToServer();
-                setTimeout(() => {
-                    if (socket && socket.connected) {
-                        socket.emit('joinRoom', { roomCode, playerName });
-                    }
-                }, 1000);
-            } else {
-                socket.emit('joinRoom', { roomCode, playerName });
-            }
+        function resetBoard() {
+            gameState.board = {
+                horizontalWalls: Array(8).fill().map(() => Array(9).fill(false)),
+                verticalWalls: Array(9).fill().map(() => Array(8).fill(false))
+            };
         }
 
         function createBoard() {
@@ -1268,48 +857,611 @@
                     cell.className = 'cell';
                     cell.dataset.x = x;
                     cell.dataset.y = y;
-                    
                     cell.addEventListener('click', () => handleCellClick(x, y));
-                    
                     board.appendChild(cell);
                 }
             }
-            
-            game.updateUI();
         }
 
         function handleCellClick(x, y) {
-            if (game.gameStatus !== 'playing') return;
+            if (gameState.gameOver) return;
             
-            const playerId = game.isOnline ? game.myPlayerId : game.currentPlayer;
+            if (gameState.mode === 'online' && gameState.currentPlayer !== playerId) {
+                showToast("It's not your turn!", 'error');
+                return;
+            }
+
+            if (gameState.currentAction === 'move') {
+                makeMove(x, y);
+            }
+        }
+
+        function makeMove(x, y) {
+            const newPosition = { x, y };
             
-            if (game.currentAction === 'move') {
-                const move = { x, y };
-                if (game.makeMove(playerId, move)) {
-                    clearHighlights();
-                    game.currentAction = null;
-                    updateActionButtons();
+            if (!isValidMove(gameState.currentPlayer, newPosition)) {
+                showToast('Invalid move!', 'error');
+                return;
+            }
+
+            if (gameState.mode === 'online') {
+                socket.emit('movePawn', {
+                    roomCode: roomCode,
+                    playerId: playerId,
+                    position: newPosition
+                });
+            } else {
+                gameState.players[gameState.currentPlayer].position = newPosition;
+                
+                if (checkWinCondition(gameState.currentPlayer)) {
+                    gameState.gameOver = true;
+                    showGameOver(gameState.players[gameState.currentPlayer].name);
+                    return;
                 }
+                
+                gameState.currentPlayer = (gameState.currentPlayer + 1) % 2;
+                gameState.currentAction = null;
+                updateUI();
+                
+                // AI turn
+                if (gameState.mode === 'ai' && gameState.currentPlayer === 1 && !gameState.gameOver) {
+                    setTimeout(makeAIMove, 1000);
+                }
+            }
+        }
+
+        function setAction(action) {
+            if (gameState.gameOver) return;
+            
+            if (gameState.mode === 'online' && gameState.currentPlayer !== playerId) {
+                showToast("It's not your turn!", 'error');
+                return;
+            }
+
+            if (gameState.currentAction === action) {
+                gameState.currentAction = null;
+            } else {
+                gameState.currentAction = action;
+            }
+            
+            updateUI();
+        }
+
+        function placeWall(x, y, orientation) {
+            const wall = { x, y, orientation };
+            
+            if (!isValidWallPlacement(gameState.currentPlayer, wall)) {
+                showToast('Invalid wall placement!', 'error');
+                return;
+            }
+
+            if (gameState.mode === 'online') {
+                socket.emit('placeWall', {
+                    roomCode: roomCode,
+                    playerId: playerId,
+                    wall: wall
+                });
+            } else {
+                // Place wall on board
+                if (orientation === 'horizontal') {
+                    gameState.board.horizontalWalls[x][y] = true;
+                    gameState.board.horizontalWalls[x + 1][y] = true;
+                } else {
+                    gameState.board.verticalWalls[x][y] = true;
+                    gameState.board.verticalWalls[x][y + 1] = true;
+                }
+                
+                gameState.players[gameState.currentPlayer].walls--;
+                gameState.currentPlayer = (gameState.currentPlayer + 1) % 2;
+                gameState.currentAction = null;
+                updateUI();
+                
+                // AI turn
+                if (gameState.mode === 'ai' && gameState.currentPlayer === 1 && !gameState.gameOver) {
+                    setTimeout(makeAIMove, 1000);
+                }
+            }
+        }
+
+        // Game Logic
+        function isValidMove(playerId, newPosition) {
+            const player = gameState.players[playerId];
+            const currentPos = player.position;
+
+            // Check bounds
+            if (newPosition.x < 0 || newPosition.x > 8 || newPosition.y < 0 || newPosition.y > 8) {
+                return false;
+            }
+
+            // Check if target is occupied
+            const isOccupied = gameState.players.some(p => 
+                p.position.x === newPosition.x && p.position.y === newPosition.y
+            );
+            if (isOccupied) return false;
+
+            const dx = Math.abs(newPosition.x - currentPos.x);
+            const dy = Math.abs(newPosition.y - currentPos.y);
+
+            // Adjacent move
+            if ((dx === 1 && dy === 0) || (dx === 0 && dy === 1)) {
+                return !isWallBetween(currentPos, newPosition);
+            }
+
+            // Jump move
+            if ((dx === 2 && dy === 0) || (dx === 0 && dy === 2)) {
+                const midPoint = {
+                    x: currentPos.x + (newPosition.x - currentPos.x) / 2,
+                    y: currentPos.y + (newPosition.y - currentPos.y) / 2
+                };
+                
+                // Check if opponent is at midpoint
+                const opponentAtMid = gameState.players.some(p => 
+                    p.position.x === midPoint.x && p.position.y === midPoint.y
+                );
+                if (!opponentAtMid) return false;
+                
+                return !isWallBetween(currentPos, midPoint) && !isWallBetween(midPoint, newPosition);
+            }
+
+            // Diagonal jump
+            if (dx === 1 && dy === 1) {
+                // Find adjacent opponent
+                const directions = [
+                    { x: 0, y: 1 }, { x: 0, y: -1 }, { x: 1, y: 0 }, { x: -1, y: 0 }
+                ];
+                
+                let opponentPos = null;
+                for (let dir of directions) {
+                    const checkPos = { x: currentPos.x + dir.x, y: currentPos.y + dir.y };
+                    const opponent = gameState.players.find(p => 
+                        p.position.x === checkPos.x && p.position.y === checkPos.y
+                    );
+                    if (opponent) {
+                        opponentPos = checkPos;
+                        break;
+                    }
+                }
+                
+                if (!opponentPos) return false;
+                
+                // Check if straight jump is blocked
+                const straightJump = {
+                    x: currentPos.x + (opponentPos.x - currentPos.x) * 2,
+                    y: currentPos.y + (opponentPos.y - currentPos.y) * 2
+                };
+                
+                if (straightJump.x >= 0 && straightJump.x <= 8 && 
+                    straightJump.y >= 0 && straightJump.y <= 8) {
+                    const straightBlocked = gameState.players.some(p => 
+                        p.position.x === straightJump.x && p.position.y === straightJump.y
+                    ) || isWallBetween(opponentPos, straightJump);
+                    
+                    if (!straightBlocked) return false;
+                }
+                
+                return !isWallBetween(currentPos, opponentPos) && !isWallBetween(opponentPos, newPosition);
+            }
+
+            return false;
+        }
+
+        function isValidWallPlacement(playerId, wall) {
+            const player = gameState.players[playerId];
+            if (player.walls <= 0) return false;
+
+            const { x, y, orientation } = wall;
+
+            // Check bounds
+            if (orientation === 'horizontal') {
+                if (x < 0 || x > 7 || y < 1 || y > 8) return false;
+                if (gameState.board.horizontalWalls[x][y] || gameState.board.horizontalWalls[x + 1][y]) return false;
+            } else {
+                if (x < 1 || x > 8 || y < 0 || y > 7) return false;
+                if (gameState.board.verticalWalls[x][y] || gameState.board.verticalWalls[x][y + 1]) return false;
+            }
+
+            // Check intersections
+            if (orientation === 'horizontal' && y > 0 && y < 8) {
+                if (gameState.board.verticalWalls[x + 1][y - 1] && gameState.board.verticalWalls[x + 1][y]) return false;
+            } else if (orientation === 'vertical' && x > 0 && x < 8) {
+                if (gameState.board.horizontalWalls[x - 1][y + 1] && gameState.board.horizontalWalls[x][y + 1]) return false;
+            }
+
+            // Check if wall blocks all paths
+            const tempBoard = JSON.parse(JSON.stringify(gameState.board));
+            if (orientation === 'horizontal') {
+                tempBoard.horizontalWalls[x][y] = true;
+                tempBoard.horizontalWalls[x + 1][y] = true;
+            } else {
+                tempBoard.verticalWalls[x][y] = true;
+                tempBoard.verticalWalls[x][y + 1] = true;
+            }
+            
+            for (let i = 0; i < gameState.players.length; i++) {
+                if (!hasPathToGoal(tempBoard, gameState.players[i].position, i)) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        function isWallBetween(pos1, pos2) {
+            if (pos1.x === pos2.x) {
+                // Vertical movement
+                const x = pos1.x;
+                const minY = Math.min(pos1.y, pos2.y);
+                return gameState.board.horizontalWalls[x] && gameState.board.horizontalWalls[x][minY + 1];
+            } else if (pos1.y === pos2.y) {
+                // Horizontal movement
+                const y = pos1.y;
+                const minX = Math.min(pos1.x, pos2.x);
+                return gameState.board.verticalWalls[minX + 1] && gameState.board.verticalWalls[minX + 1][y];
+            }
+            return false;
+        }
+
+        function hasPathToGoal(board, position, playerId) {
+            const visited = Array(9).fill().map(() => Array(9).fill(false));
+            const queue = [position];
+            visited[position.x][position.y] = true;
+
+            const goalY = playerId === 0 ? 8 : 0;
+
+            while (queue.length > 0) {
+                const pos = queue.shift();
+
+                if (pos.y === goalY) return true;
+
+                const directions = [
+                    { x: 0, y: 1 }, { x: 0, y: -1 },
+                    { x: 1, y: 0 }, { x: -1, y: 0 }
+                ];
+
+                for (const dir of directions) {
+                    const newPos = { x: pos.x + dir.x, y: pos.y + dir.y };
+
+                    if (newPos.x < 0 || newPos.x > 8 || newPos.y < 0 || newPos.y > 8) continue;
+                    if (visited[newPos.x][newPos.y]) continue;
+                    if (isWallBetweenBoard(board, pos, newPos)) continue;
+
+                    visited[newPos.x][newPos.y] = true;
+                    queue.push(newPos);
+                }
+            }
+
+            return false;
+        }
+
+        function isWallBetweenBoard(board, pos1, pos2) {
+            if (pos1.x === pos2.x) {
+                const x = pos1.x;
+                const minY = Math.min(pos1.y, pos2.y);
+                return board.horizontalWalls[x] && board.horizontalWalls[x][minY + 1];
+            } else if (pos1.y === pos2.y) {
+                const y = pos1.y;
+                const minX = Math.min(pos1.x, pos2.x);
+                return board.verticalWalls[minX + 1] && board.verticalWalls[minX + 1][y];
+            }
+            return false;
+        }
+
+        function checkWinCondition(playerId) {
+            const player = gameState.players[playerId];
+            return (playerId === 0 && player.position.y === 8) || 
+                   (playerId === 1 && player.position.y === 0);
+        }
+
+        function getValidMoves(playerId) {
+            const moves = [];
+            for (let x = 0; x < 9; x++) {
+                for (let y = 0; y < 9; y++) {
+                    if (isValidMove(playerId, { x, y })) {
+                        moves.push({ x, y });
+                    }
+                }
+            }
+            return moves;
+        }
+
+        function getValidWalls(playerId) {
+            const walls = [];
+            
+            // Horizontal walls
+            for (let x = 0; x < 8; x++) {
+                for (let y = 1; y < 9; y++) {
+                    const wall = { x, y, orientation: 'horizontal' };
+                    if (isValidWallPlacement(playerId, wall)) {
+                        walls.push(wall);
+                    }
+                }
+            }
+            
+            // Vertical walls
+            for (let x = 1; x < 9; x++) {
+                for (let y = 0; y < 8; y++) {
+                    const wall = { x, y, orientation: 'vertical' };
+                    if (isValidWallPlacement(playerId, wall)) {
+                        walls.push(wall);
+                    }
+                }
+            }
+            
+            return walls;
+        }
+
+        // AI Implementation
+        function makeAIMove() {
+            if (gameState.gameOver || gameState.currentPlayer !== 1) return;
+
+            const move = getBestAIMove();
+            
+            if (move.type === 'move') {
+                gameState.players[1].position = move.position;
+                
+                if (checkWinCondition(1)) {
+                    gameState.gameOver = true;
+                    showGameOver(gameState.players[1].name);
+                    return;
+                }
+            } else if (move.type === 'wall') {
+                const wall = move.wall;
+                if (wall.orientation === 'horizontal') {
+                    gameState.board.horizontalWalls[wall.x][wall.y] = true;
+                    gameState.board.horizontalWalls[wall.x + 1][wall.y] = true;
+                } else {
+                    gameState.board.verticalWalls[wall.x][wall.y] = true;
+                    gameState.board.verticalWalls[wall.x][wall.y + 1] = true;
+                }
+                gameState.players[1].walls--;
+            }
+            
+            gameState.currentPlayer = 0;
+            updateUI();
+        }
+
+        function getBestAIMove() {
+            const difficulty = gameState.aiDifficulty;
+            const validMoves = getValidMoves(1);
+            const validWalls = getValidWalls(1);
+            
+            if (difficulty === 'easy') {
+                // Random move with slight preference for forward movement
+                if (Math.random() < 0.8 && validMoves.length > 0) {
+                    const forwardMoves = validMoves.filter(move => move.y < gameState.players[1].position.y);
+                    const selectedMoves = forwardMoves.length > 0 ? forwardMoves : validMoves;
+                    const randomMove = selectedMoves[Math.floor(Math.random() * selectedMoves.length)];
+                    return { type: 'move', position: randomMove };
+                } else if (gameState.players[1].walls > 0 && validWalls.length > 0) {
+                    const randomWall = validWalls[Math.floor(Math.random() * validWalls.length)];
+                    return { type: 'wall', wall: randomWall };
+                }
+            } else if (difficulty === 'medium') {
+                // Strategic AI
+                const playerDistance = getDistanceToGoal(gameState.players[0].position, 0);
+                const aiDistance = getDistanceToGoal(gameState.players[1].position, 1);
+                
+                // If player is close to winning, try to block
+                if (playerDistance <= 3 && gameState.players[1].walls > 0 && validWalls.length > 0) {
+                    const blockingWall = findBestBlockingWall(validWalls);
+                    if (blockingWall) {
+                        return { type: 'wall', wall: blockingWall };
+                    }
+                }
+                
+                // Otherwise, move towards goal
+                if (validMoves.length > 0) {
+                    let bestMove = validMoves[0];
+                    let bestDistance = getDistanceToGoal(bestMove, 1);
+                    
+                    for (let move of validMoves) {
+                        const distance = getDistanceToGoal(move, 1);
+                        if (distance < bestDistance) {
+                            bestDistance = distance;
+                            bestMove = move;
+                        }
+                    }
+                    
+                    return { type: 'move', position: bestMove };
+                }
+            } else if (difficulty === 'hard') {
+                // Advanced AI with minimax-like evaluation
+                let bestScore = -Infinity;
+                let bestMove = null;
+                
+                // Evaluate moves
+                for (let move of validMoves) {
+                    const score = evaluateMove(move, 1);
+                    if (score > bestScore) {
+                        bestScore = score;
+                        bestMove = { type: 'move', position: move };
+                    }
+                }
+                
+                // Evaluate walls
+                if (gameState.players[1].walls > 0) {
+                    for (let wall of validWalls.slice(0, 20)) { // Limit for performance
+                        const score = evaluateWall(wall, 1);
+                        if (score > bestScore) {
+                            bestScore = score;
+                            bestMove = { type: 'wall', wall: wall };
+                        }
+                    }
+                }
+                
+                if (bestMove) return bestMove;
+            }
+            
+            // Fallback: random valid move
+            if (validMoves.length > 0) {
+                const randomMove = validMoves[Math.floor(Math.random() * validMoves.length)];
+                return { type: 'move', position: randomMove };
+            }
+            
+            return null;
+        }
+
+        function getDistanceToGoal(position, playerId) {
+            // BFS to find shortest path
+            const visited = Array(9).fill().map(() => Array(9).fill(false));
+            const queue = [{ pos: position, distance: 0 }];
+            visited[position.x][position.y] = true;
+            
+            const goalY = playerId === 0 ? 8 : 0;
+            
+            while (queue.length > 0) {
+                const { pos, distance } = queue.shift();
+                
+                if (pos.y === goalY) return distance;
+                
+                const directions = [
+                    { x: 0, y: 1 }, { x: 0, y: -1 },
+                    { x: 1, y: 0 }, { x: -1, y: 0 }
+                ];
+                
+                for (let dir of directions) {
+                    const newPos = { x: pos.x + dir.x, y: pos.y + dir.y };
+                    
+                    if (newPos.x < 0 || newPos.x > 8 || newPos.y < 0 || newPos.y > 8) continue;
+                    if (visited[newPos.x][newPos.y]) continue;
+                    if (isWallBetween(pos, newPos)) continue;
+                    
+                    visited[newPos.x][newPos.y] = true;
+                    queue.push({ pos: newPos, distance: distance + 1 });
+                }
+            }
+            
+            return Infinity;
+        }
+
+        function findBestBlockingWall(validWalls) {
+            let bestWall = null;
+            let maxIncrease = 0;
+            
+            const currentDistance = getDistanceToGoal(gameState.players[0].position, 0);
+            
+            for (let wall of validWalls.slice(0, 15)) {
+                // Simulate wall placement
+                const tempBoard = JSON.parse(JSON.stringify(gameState.board));
+                if (wall.orientation === 'horizontal') {
+                    tempBoard.horizontalWalls[wall.x][wall.y] = true;
+                    tempBoard.horizontalWalls[wall.x + 1][wall.y] = true;
+                } else {
+                    tempBoard.verticalWalls[wall.x][wall.y] = true;
+                    tempBoard.verticalWalls[wall.x][wall.y + 1] = true;
+                }
+                
+                const newDistance = hasPathToGoal(tempBoard, gameState.players[0].position, 0) ? 
+                    getDistanceToGoalWithBoard(tempBoard, gameState.players[0].position, 0) : Infinity;
+                
+                const increase = newDistance - currentDistance;
+                if (increase > maxIncrease) {
+                    maxIncrease = increase;
+                    bestWall = wall;
+                }
+            }
+            
+            return bestWall;
+        }
+
+        function getDistanceToGoalWithBoard(board, position, playerId) {
+            const visited = Array(9).fill().map(() => Array(9).fill(false));
+            const queue = [{ pos: position, distance: 0 }];
+            visited[position.x][position.y] = true;
+            
+            const goalY = playerId === 0 ? 8 : 0;
+            
+            while (queue.length > 0) {
+                const { pos, distance } = queue.shift();
+                
+                if (pos.y === goalY) return distance;
+                
+                const directions = [
+                    { x: 0, y: 1 }, { x: 0, y: -1 },
+                    { x: 1, y: 0 }, { x: -1, y: 0 }
+                ];
+                
+                for (let dir of directions) {
+                    const newPos = { x: pos.x + dir.x, y: pos.y + dir.y };
+                    
+                    if (newPos.x < 0 || newPos.x > 8 || newPos.y < 0 || newPos.y > 8) continue;
+                    if (visited[newPos.x][newPos.y]) continue;
+                    if (isWallBetweenBoard(board, pos, newPos)) continue;
+                    
+                    visited[newPos.x][newPos.y] = true;
+                    queue.push({ pos: newPos, distance: distance + 1 });
+                }
+            }
+            
+            return Infinity;
+        }
+
+        function evaluateMove(move, playerId) {
+            const goalY = playerId === 0 ? 8 : 0;
+            const distanceToGoal = Math.abs(move.y - goalY);
+            const centerDistance = Math.abs(move.x - 4);
+            
+            return -distanceToGoal * 10 - centerDistance;
+        }
+
+        function evaluateWall(wall, playerId) {
+            const opponentId = 1 - playerId;
+            const currentOpponentDistance = getDistanceToGoal(gameState.players[opponentId].position, opponentId);
+            
+            // Simulate wall placement
+            const tempBoard = JSON.parse(JSON.stringify(gameState.board));
+            if (wall.orientation === 'horizontal') {
+                tempBoard.horizontalWalls[wall.x][wall.y] = true;
+                tempBoard.horizontalWalls[wall.x + 1][wall.y] = true;
+            } else {
+                tempBoard.verticalWalls[wall.x][wall.y] = true;
+                tempBoard.verticalWalls[wall.x][wall.y + 1] = true;
+            }
+            
+            const newOpponentDistance = getDistanceToGoalWithBoard(tempBoard, gameState.players[opponentId].position, opponentId);
+            const newPlayerDistance = getDistanceToGoalWithBoard(tempBoard, gameState.players[playerId].position, playerId);
+            const currentPlayerDistance = getDistanceToGoal(gameState.players[playerId].position, playerId);
+            
+            return (newOpponentDistance - currentOpponentDistance) * 5 - (newPlayerDistance - currentPlayerDistance) * 3;
+        }
+
+        // UI Update Functions
+        function updateUI() {
+            updatePlayerInfo();
+            updateBoard();
+            updateWalls();
+            updateTurnIndicator();
+            updateActionButtons();
+            
+            if (gameState.currentAction === 'move') {
+                highlightValidMoves();
+            } else if (gameState.currentAction === 'wall') {
+                showWallPreviews();
+            } else {
+                clearHighlights();
+                clearWallPreviews();
             }
         }
 
         function updatePlayerInfo() {
-            document.getElementById('player1Name').textContent = game.players[0].name;
-            document.getElementById('player2Name').textContent = game.players[1].name;
-            document.getElementById('player1Walls').textContent = game.players[0].walls;
-            document.getElementById('player2Walls').textContent = game.players[1].walls;
+            document.getElementById('player1Name').textContent = gameState.players[0].name;
+            document.getElementById('player2Name').textContent = gameState.players[1].name;
+            document.getElementById('player1Walls').textContent = gameState.players[0].walls;
+            document.getElementById('player2Walls').textContent = gameState.players[1].walls;
             
-            const player1Avatar = document.querySelector('.player-avatar.p1');
-            const player2Avatar = document.querySelector('.player-avatar.p2');
+            const player1Avatar = document.getElementById('player1Avatar');
+            const player2Avatar = document.getElementById('player2Avatar');
             
-            player1Avatar.classList.toggle('active', game.currentPlayer === 0);
-            player2Avatar.classList.toggle('active', game.currentPlayer === 1);
+            player1Avatar.classList.toggle('active', gameState.currentPlayer === 0);
+            player2Avatar.classList.toggle('active', gameState.currentPlayer === 1);
         }
 
         function updateBoard() {
+            // Clear existing pawns
             document.querySelectorAll('.pawn').forEach(pawn => pawn.remove());
             
-            game.players.forEach((player, index) => {
+            // Add pawns
+            gameState.players.forEach((player, index) => {
                 const cell = document.querySelector(`[data-x="${player.position.x}"][data-y="${player.position.y}"]`);
                 if (cell) {
                     const pawn = document.createElement('div');
@@ -1324,17 +1476,15 @@
             const wallsLayer = document.getElementById('wallsLayer');
             wallsLayer.querySelectorAll('.wall:not(.preview)').forEach(wall => wall.remove());
             
-            const cellSize = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--cell-size'));
-            const gap = 4;
-            
+            // Add horizontal walls
             for (let x = 0; x < 8; x++) {
                 for (let y = 0; y < 9; y++) {
-                    if (game.board.horizontalWalls[x][y]) {
+                    if (gameState.board.horizontalWalls[x][y]) {
                         const wall = document.createElement('div');
                         wall.className = 'wall horizontal';
                         
-                        const left = x * (cellSize + gap) + cellSize / 2;
-                        const top = y * (cellSize + gap) - 4;
+                        const left = x * 68 + 30; // 60px cell + 8px gap, centered
+                        const top = y * 68 - 4;
                         
                         wall.style.left = `${left}px`;
                         wall.style.top = `${top}px`;
@@ -1344,14 +1494,15 @@
                 }
             }
             
+            // Add vertical walls
             for (let x = 0; x < 9; x++) {
                 for (let y = 0; y < 8; y++) {
-                    if (game.board.verticalWalls[x][y]) {
+                    if (gameState.board.verticalWalls[x][y]) {
                         const wall = document.createElement('div');
                         wall.className = 'wall vertical';
                         
-                        const left = x * (cellSize + gap) - 4;
-                        const top = y * (cellSize + gap) + cellSize / 2;
+                        const left = x * 68 - 4;
+                        const top = y * 68 + 30;
                         
                         wall.style.left = `${left}px`;
                         wall.style.top = `${top}px`;
@@ -1363,19 +1514,17 @@
         }
 
         function updateTurnIndicator() {
-            const turnIndicator = document.getElementById('turnIndicator');
-            const currentPlayer = game.players[game.currentPlayer];
+            const indicator = document.getElementById('turnIndicator');
+            const currentPlayer = gameState.players[gameState.currentPlayer];
             
-            if (game.gameStatus === 'playing') {
-                if (game.isOnline) {
-                    if (game.currentPlayer === game.myPlayerId) {
-                        turnIndicator.textContent = 'Your Turn';
-                    } else {
-                        turnIndicator.textContent = `${currentPlayer.name}'s Turn`;
-                    }
-                } else {
-                    turnIndicator.textContent = `${currentPlayer.name}'s Turn`;
-                }
+            if (gameState.gameOver) {
+                indicator.textContent = 'Game Over';
+            } else if (gameState.mode === 'ai' && gameState.currentPlayer === 1) {
+                indicator.textContent = 'AI is thinking...';
+            } else if (gameState.mode === 'online' && gameState.currentPlayer !== playerId) {
+                indicator.textContent = `${currentPlayer.name}'s Turn`;
+            } else {
+                indicator.textContent = `${currentPlayer.name}'s Turn`;
             }
         }
 
@@ -1383,70 +1532,66 @@
             const moveBtn = document.getElementById('moveBtn');
             const wallBtn = document.getElementById('wallBtn');
             
-            const isMyTurn = game.gameStatus === 'playing' && 
-                           (!game.isOnline || game.currentPlayer === game.myPlayerId);
+            const isPlayerTurn = !gameState.gameOver && 
+                               (gameState.mode !== 'online' || gameState.currentPlayer === playerId) &&
+                               (gameState.mode !== 'ai' || gameState.currentPlayer === 0);
             
-            moveBtn.disabled = !isMyTurn;
-            wallBtn.disabled = !isMyTurn || (game.isOnline ? 
-                game.players[game.myPlayerId].walls <= 0 : 
-                game.players[game.currentPlayer].walls <= 0);
+            moveBtn.disabled = !isPlayerTurn;
+            wallBtn.disabled = !isPlayerTurn || gameState.players[gameState.currentPlayer].walls <= 0;
             
-            moveBtn.classList.toggle('active', game.currentAction === 'move');
-            wallBtn.classList.toggle('active', game.currentAction === 'wall');
+            moveBtn.classList.toggle('active', gameState.currentAction === 'move');
+            wallBtn.classList.toggle('active', gameState.currentAction === 'wall');
         }
 
         function highlightValidMoves() {
             clearHighlights();
             
-            const playerId = game.isOnline ? game.myPlayerId : game.currentPlayer;
-            const validMoves = game.getValidMoves(playerId);
-            
+            const validMoves = getValidMoves(gameState.currentPlayer);
             validMoves.forEach(move => {
                 const cell = document.querySelector(`[data-x="${move.x}"][data-y="${move.y}"]`);
                 if (cell) {
-                    cell.classList.add('valid-move');
+                    const player = gameState.players[gameState.currentPlayer];
+                    const dx = Math.abs(move.x - player.position.x);
+                    const dy = Math.abs(move.y - player.position.y);
+                    const isJump = dx === 2 || dy === 2 || (dx === 1 && dy === 1);
+                    
+                    cell.classList.add(isJump ? 'valid-jump' : 'valid-move');
                 }
             });
         }
 
         function clearHighlights() {
-            document.querySelectorAll('.valid-move').forEach(cell => {
-                cell.classList.remove('valid-move');
+            document.querySelectorAll('.valid-move, .valid-jump').forEach(cell => {
+                cell.classList.remove('valid-move', 'valid-jump');
             });
         }
 
         function showWallPreviews() {
             clearWallPreviews();
             
-            const playerId = game.isOnline ? game.myPlayerId : game.currentPlayer;
-            const validWalls = game.getValidWallPlacements(playerId);
-            const cellSize = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--cell-size'));
-            const gap = 4;
+            const validWalls = getValidWalls(gameState.currentPlayer);
             const wallsLayer = document.getElementById('wallsLayer');
             
-            validWalls.slice(0, 20).forEach(wall => {
+            // Limit previews for performance
+            validWalls.slice(0, 30).forEach(wall => {
                 const preview = document.createElement('div');
                 preview.className = `wall preview ${wall.orientation}`;
                 
                 let left, top;
                 
                 if (wall.orientation === 'horizontal') {
-                    left = wall.x * (cellSize + gap) + cellSize / 2;
-                    top = wall.y * (cellSize + gap) - 4;
+                    left = wall.x * 68 + 30;
+                    top = wall.y * 68 - 4;
                 } else {
-                    left = wall.x * (cellSize + gap) - 4;
-                    top = wall.y * (cellSize + gap) + cellSize / 2;
+                    left = wall.x * 68 - 4;
+                    top = wall.y * 68 + 30;
                 }
                 
                 preview.style.left = `${left}px`;
                 preview.style.top = `${top}px`;
                 
                 preview.addEventListener('click', () => {
-                    if (game.placeWall(playerId, wall)) {
-                        clearWallPreviews();
-                        game.currentAction = null;
-                        updateActionButtons();
-                    }
+                    placeWall(wall.x, wall.y, wall.orientation);
                 });
                 
                 wallsLayer.appendChild(preview);
@@ -1457,54 +1602,26 @@
             document.querySelectorAll('.wall.preview').forEach(preview => preview.remove());
         }
 
-        function setAction(action) {
-            if (game.gameStatus !== 'playing') return;
-            
-            const isMyTurn = !game.isOnline || game.currentPlayer === game.myPlayerId;
-            if (!isMyTurn) return;
-            
-            if (game.currentAction === action) {
-                game.currentAction = null;
-                clearHighlights();
-                clearWallPreviews();
-            } else {
-                game.currentAction = action;
-                clearHighlights();
-                clearWallPreviews();
-                
-                if (action === 'move') {
-                    highlightValidMoves();
-                } else if (action === 'wall') {
-                    showWallPreviews();
-                }
-            }
-            
-            updateActionButtons();
+        function showGameOver(winnerName) {
+            document.getElementById('gameOverTitle').textContent = 'Game Over!';
+            document.getElementById('gameOverMessage').textContent = `${winnerName} wins!`;
+            document.getElementById('gameOverModal').classList.add('active');
         }
 
-        function quitGame() {
-            if (confirm('Are you sure you want to quit the game?')) {
-                if (game.isOnline && socket) {
-                    socket.disconnect();
-                    socket = null;
-                }
+        function restartGame() {
+            document.getElementById('gameOverModal').classList.remove('active');
+            
+            if (gameState.mode === 'local') {
+                startLocalGame();
+            } else if (gameState.mode === 'ai') {
+                startAIGame(gameState.aiDifficulty);
+            } else {
                 showMainMenu();
             }
         }
 
-        // Keyboard controls
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                if (game.gameStatus === 'playing') {
-                    quitGame();
-                }
-            }
-        });
-
         // Initialize
-        document.addEventListener('DOMContentLoaded', () => {
-            showMainMenu();
-        });
+        updateConnectionStatus('disconnected');
     </script>
 </body>
 </html>

@@ -9,7 +9,10 @@ const io = socketIo(server, {
     cors: {
         origin: "*",
         methods: ["GET", "POST"]
-    }
+    },
+    pingTimeout: 60000,
+    pingInterval: 25000,
+    transports: ['websocket', 'polling']
 });
 
 // Serve static files
@@ -20,12 +23,22 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
+// Health check endpoint
+app.get('/health', (req, res) => {
+    res.json({ status: 'OK', timestamp: new Date().toISOString() });
+});
+
 // Game state storage
-const games = {};
+const games = new Map();
+const playerRooms = new Map(); // Track which room each player is in
 
 // Helper functions
 function generateRoomCode() {
-    return Math.random().toString(36).substring(2, 8).toUpperCase();
+    let code;
+    do {
+        code = Math.random().toString(36).substring(2, 8).toUpperCase();
+    } while (games.has(code));
+    return code;
 }
 
 function initializeBoard() {
@@ -35,8 +48,22 @@ function initializeBoard() {
     };
 }
 
+function createNewGame(roomCode, firstPlayer) {
+    return {
+        id: roomCode,
+        players: [firstPlayer],
+        board: initializeBoard(),
+        currentTurn: 0,
+        status: 'waiting',
+        createdAt: Date.now(),
+        lastActivity: Date.now()
+    };
+}
+
 function isValidMove(game, playerId, newPosition) {
     const player = game.players[playerId];
+    if (!player) return false;
+    
     const currentPos = player.position;
 
     // Check bounds
@@ -120,7 +147,7 @@ function isValidMove(game, playerId, newPosition) {
 
 function isValidWallPlacement(game, playerId, wall) {
     const player = game.players[playerId];
-    if (player.walls <= 0) return false;
+    if (!player || player.walls <= 0) return false;
 
     const { x, y, orientation } = wall;
 
@@ -144,8 +171,8 @@ function isValidWallPlacement(game, playerId, wall) {
     const tempBoard = JSON.parse(JSON.stringify(game.board));
     placeWallOnBoard(tempBoard, wall);
     
-    for (let player of game.players) {
-        if (!hasPathToGoal(tempBoard, player.position, player.id)) {
+    for (let i = 0; i < game.players.length; i++) {
+        if (!hasPathToGoal(tempBoard, game.players[i].position, i)) {
             return false;
         }
     }
@@ -214,8 +241,48 @@ function hasPathToGoal(board, position, playerId) {
 
 function checkWinCondition(game, playerId) {
     const player = game.players[playerId];
+    if (!player) return false;
+    
     return (playerId === 0 && player.position.y === 8) || 
            (playerId === 1 && player.position.y === 0);
+}
+
+function updateGameActivity(roomCode) {
+    const game = games.get(roomCode);
+    if (game) {
+        game.lastActivity = Date.now();
+    }
+}
+
+function cleanupPlayer(socketId) {
+    const roomCode = playerRooms.get(socketId);
+    if (roomCode) {
+        const game = games.get(roomCode);
+        if (game) {
+            const playerIndex = game.players.findIndex(p => p.id === socketId);
+            
+            if (playerIndex !== -1) {
+                if (game.status === 'playing') {
+                    // Notify other players
+                    io.to(roomCode).emit('playerLeft', { playerId: playerIndex });
+                    game.status = 'abandoned';
+                    
+                    // Keep the game for a short while in case player reconnects
+                    setTimeout(() => {
+                        if (games.has(roomCode) && games.get(roomCode).status === 'abandoned') {
+                            games.delete(roomCode);
+                            console.log(`Cleaned up abandoned game: ${roomCode}`);
+                        }
+                    }, 30000); // 30 seconds
+                } else if (game.status === 'waiting') {
+                    // Remove waiting game immediately
+                    games.delete(roomCode);
+                    console.log(`Removed waiting game: ${roomCode}`);
+                }
+            }
+        }
+        playerRooms.delete(socketId);
+    }
 }
 
 // Socket.io connection handling
@@ -223,175 +290,251 @@ io.on('connection', (socket) => {
     console.log('New client connected:', socket.id);
 
     socket.on('joinRoom', (data) => {
-        let roomCode = data.roomCode;
-        
-        // If no room code provided, generate one
-        if (!roomCode) {
-            roomCode = generateRoomCode();
-        }
-        
-        let game = games[roomCode];
+        try {
+            let roomCode = data.roomCode;
+            const playerName = data.playerName || 'Anonymous';
+            
+            // Clean up any existing room association
+            cleanupPlayer(socket.id);
+            
+            // If no room code provided, generate one
+            if (!roomCode) {
+                roomCode = generateRoomCode();
+            }
+            
+            let game = games.get(roomCode);
 
-        if (!game) {
-            // Create new game
-            games[roomCode] = {
-                id: roomCode,
-                players: [{
+            if (!game) {
+                // Create new game
+                const newPlayer = {
                     id: socket.id,
-                    name: data.playerName || 'Player 1',
+                    name: playerName,
                     position: { x: 4, y: 0 },
                     walls: 10
-                }],
-                board: initializeBoard(),
-                currentTurn: 0,
-                status: 'waiting'
-            };
+                };
+                
+                game = createNewGame(roomCode, newPlayer);
+                games.set(roomCode, game);
+                
+                socket.join(roomCode);
+                playerRooms.set(socket.id, roomCode);
+                socket.emit('roomJoined', { roomCode, playerId: 0 });
+                
+                console.log(`Room created: ${roomCode} by ${socket.id}`);
+            } else if (game.players.length === 1 && game.status === 'waiting') {
+                // Join existing room
+                const newPlayer = {
+                    id: socket.id,
+                    name: playerName,
+                    position: { x: 4, y: 8 },
+                    walls: 10
+                };
+                
+                game.players.push(newPlayer);
+                socket.join(roomCode);
+                playerRooms.set(socket.id, roomCode);
+                socket.emit('roomJoined', { roomCode, playerId: 1 });
 
-            socket.join(roomCode);
-            socket.emit('roomJoined', { roomCode, playerId: 0 });
-            console.log(`Room created: ${roomCode} by ${socket.id}`);
-        } else if (game.players.length === 1 && game.status === 'waiting') {
-            // Join existing room
-            game.players.push({
-                id: socket.id,
-                name: data.playerName || 'Player 2',
-                position: { x: 4, y: 8 },
-                walls: 10
-            });
-
-            socket.join(roomCode);
-            socket.emit('roomJoined', { roomCode, playerId: 1 });
-
-            // Start the game
-            game.status = 'playing';
-            io.to(roomCode).emit('gameStarted', {
-                players: game.players.map(p => ({ name: p.name, position: p.position, walls: p.walls })),
-                board: game.board,
-                currentTurn: game.currentTurn
-            });
-            console.log(`Player joined room: ${roomCode}, game started`);
-        } else {
-            socket.emit('error', { message: 'Room is full or game in progress' });
+                // Start the game
+                game.status = 'playing';
+                game.lastActivity = Date.now();
+                
+                const gameData = {
+                    players: game.players.map(p => ({ 
+                        name: p.name, 
+                        position: p.position, 
+                        walls: p.walls 
+                    })),
+                    board: game.board,
+                    currentTurn: game.currentTurn
+                };
+                
+                io.to(roomCode).emit('gameStarted', gameData);
+                console.log(`Player joined room: ${roomCode}, game started`);
+            } else {
+                socket.emit('error', { message: 'Room is full or game in progress' });
+            }
+        } catch (error) {
+            console.error('Error in joinRoom:', error);
+            socket.emit('error', { message: 'Failed to join room' });
         }
     });
 
     socket.on('movePawn', (data) => {
-        const { roomCode, playerId, position } = data;
-        const game = games[roomCode];
+        try {
+            const { roomCode, playerId, position } = data;
+            const game = games.get(roomCode);
 
-        if (!game || game.status !== 'playing') {
-            socket.emit('error', { message: 'Game not found or not in progress' });
-            return;
-        }
+            if (!game || game.status !== 'playing') {
+                socket.emit('error', { message: 'Game not found or not in progress' });
+                return;
+            }
 
-        if (game.currentTurn !== playerId) {
-            socket.emit('error', { message: 'Not your turn' });
-            return;
-        }
+            if (game.currentTurn !== playerId) {
+                socket.emit('error', { message: 'Not your turn' });
+                return;
+            }
 
-        if (!isValidMove(game, playerId, position)) {
-            socket.emit('error', { message: 'Invalid move' });
-            return;
-        }
+            if (!isValidMove(game, playerId, position)) {
+                socket.emit('error', { message: 'Invalid move' });
+                return;
+            }
 
-        // Execute move
-        game.players[playerId].position = position;
+            // Execute move
+            game.players[playerId].position = position;
+            updateGameActivity(roomCode);
 
-        // Check win condition
-        if (checkWinCondition(game, playerId)) {
-            game.status = 'finished';
-            io.to(roomCode).emit('gameOver', { winner: playerId });
-            console.log(`Game ${roomCode} finished, winner: ${playerId}`);
-        } else {
-            // Next turn
-            game.currentTurn = (game.currentTurn + 1) % 2;
-            io.to(roomCode).emit('gameUpdated', {
-                players: game.players.map(p => ({ position: p.position, walls: p.walls })),
-                board: game.board,
-                currentTurn: game.currentTurn
-            });
+            // Check win condition
+            if (checkWinCondition(game, playerId)) {
+                game.status = 'finished';
+                io.to(roomCode).emit('gameOver', { winner: playerId });
+                console.log(`Game ${roomCode} finished, winner: ${playerId}`);
+                
+                // Clean up finished game after a delay
+                setTimeout(() => {
+                    games.delete(roomCode);
+                    console.log(`Cleaned up finished game: ${roomCode}`);
+                }, 60000); // 1 minute
+            } else {
+                // Next turn
+                game.currentTurn = (game.currentTurn + 1) % 2;
+                
+                const gameData = {
+                    players: game.players.map(p => ({ 
+                        position: p.position, 
+                        walls: p.walls 
+                    })),
+                    board: game.board,
+                    currentTurn: game.currentTurn
+                };
+                
+                io.to(roomCode).emit('gameUpdated', gameData);
+            }
+        } catch (error) {
+            console.error('Error in movePawn:', error);
+            socket.emit('error', { message: 'Failed to process move' });
         }
     });
 
     socket.on('placeWall', (data) => {
-        const { roomCode, playerId, wall } = data;
-        const game = games[roomCode];
+        try {
+            const { roomCode, playerId, wall } = data;
+            const game = games.get(roomCode);
 
-        if (!game || game.status !== 'playing') {
-            socket.emit('error', { message: 'Game not found or not in progress' });
-            return;
+            if (!game || game.status !== 'playing') {
+                socket.emit('error', { message: 'Game not found or not in progress' });
+                return;
+            }
+
+            if (game.currentTurn !== playerId) {
+                socket.emit('error', { message: 'Not your turn' });
+                return;
+            }
+
+            if (!isValidWallPlacement(game, playerId, wall)) {
+                socket.emit('error', { message: 'Invalid wall placement' });
+                return;
+            }
+
+            // Place wall
+            placeWallOnBoard(game.board, wall);
+            game.players[playerId].walls--;
+            updateGameActivity(roomCode);
+
+            // Next turn
+            game.currentTurn = (game.currentTurn + 1) % 2;
+            
+            const gameData = {
+                players: game.players.map(p => ({ 
+                    position: p.position, 
+                    walls: p.walls 
+                })),
+                board: game.board,
+                currentTurn: game.currentTurn
+            };
+            
+            io.to(roomCode).emit('gameUpdated', gameData);
+        } catch (error) {
+            console.error('Error in placeWall:', error);
+            socket.emit('error', { message: 'Failed to place wall' });
         }
-
-        if (game.currentTurn !== playerId) {
-            socket.emit('error', { message: 'Not your turn' });
-            return;
-        }
-
-        if (!isValidWallPlacement(game, playerId, wall)) {
-            socket.emit('error', { message: 'Invalid wall placement' });
-            return;
-        }
-
-        // Place wall
-        placeWallOnBoard(game.board, wall);
-        game.players[playerId].walls--;
-
-        // Next turn
-        game.currentTurn = (game.currentTurn + 1) % 2;
-        io.to(roomCode).emit('gameUpdated', {
-            players: game.players.map(p => ({ position: p.position, walls: p.walls })),
-            board: game.board,
-            currentTurn: game.currentTurn
-        });
     });
 
-    socket.on('disconnect', () => {
-        console.log('Client disconnected:', socket.id);
+    socket.on('disconnect', (reason) => {
+        console.log('Client disconnected:', socket.id, 'Reason:', reason);
+        cleanupPlayer(socket.id);
+    });
 
-        // Handle game cleanup
-        for (const roomCode in games) {
-            const game = games[roomCode];
-            const playerIndex = game.players.findIndex(p => p.id === socket.id);
-
-            if (playerIndex !== -1) {
-                if (game.status === 'playing') {
-                    // Notify other player
-                    socket.to(roomCode).emit('playerLeft', { playerId: playerIndex });
-                    game.status = 'abandoned';
-                } else if (game.status === 'waiting') {
-                    // Remove waiting game
-                    delete games[roomCode];
-                }
-                break;
-            }
-        }
+    socket.on('error', (error) => {
+        console.error('Socket error:', error);
     });
 });
 
-// Clean up abandoned games periodically
+// Clean up old games periodically
 setInterval(() => {
     const now = Date.now();
-    for (const roomCode in games) {
-        const game = games[roomCode];
-        if (game.status === 'abandoned' || 
-            (game.status === 'waiting' && now - game.createdAt > 300000)) { // 5 minutes
-            delete games[roomCode];
-            console.log(`Cleaned up game: ${roomCode}`);
+    const GAME_TIMEOUT = 30 * 60 * 1000; // 30 minutes
+    const WAITING_TIMEOUT = 10 * 60 * 1000; // 10 minutes for waiting games
+    
+    for (const [roomCode, game] of games.entries()) {
+        const timeSinceActivity = now - game.lastActivity;
+        const timeSinceCreation = now - game.createdAt;
+        
+        let shouldDelete = false;
+        
+        if (game.status === 'abandoned') {
+            shouldDelete = timeSinceActivity > 60000; // 1 minute for abandoned games
+        } else if (game.status === 'waiting') {
+            shouldDelete = timeSinceCreation > WAITING_TIMEOUT;
+        } else if (game.status === 'playing') {
+            shouldDelete = timeSinceActivity > GAME_TIMEOUT;
+        } else if (game.status === 'finished') {
+            shouldDelete = timeSinceActivity > 60000; // 1 minute for finished games
+        }
+        
+        if (shouldDelete) {
+            // Clean up player room mappings
+            game.players.forEach(player => {
+                playerRooms.delete(player.id);
+            });
+            
+            games.delete(roomCode);
+            console.log(`Cleaned up game: ${roomCode} (status: ${game.status})`);
         }
     }
+    
+    console.log(`Active games: ${games.size}, Active player mappings: ${playerRooms.size}`);
 }, 60000); // Check every minute
 
-// Add creation timestamp to games
-const originalGames = games;
-Object.defineProperty(games, 'roomCode', {
-    set: function(game) {
-        game.createdAt = Date.now();
-        originalGames[game.id] = game;
-    }
+// Graceful shutdown
+process.on('SIGTERM', () => {
+    console.log('SIGTERM received, shutting down gracefully');
+    server.close(() => {
+        console.log('Server closed');
+        process.exit(0);
+    });
+});
+
+process.on('SIGINT', () => {
+    console.log('SIGINT received, shutting down gracefully');
+    server.close(() => {
+        console.log('Server closed');
+        process.exit(0);
+    });
 });
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
     console.log(`Quoridor server running on port ${PORT}`);
     console.log(`Server URL: https://wall-chess.onrender.com`);
+    console.log(`Health check: https://wall-chess.onrender.com/health`);
+});
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (error) => {
+    console.error('Uncaught Exception:', error);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
 });
