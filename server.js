@@ -3,8 +3,11 @@ const http = require('http');
 const socketIo = require('socket.io');
 const path = require('path');
 
+// Enhanced server configuration
 const app = express();
 const server = http.createServer(app);
+
+// More robust Socket.IO configuration
 const io = socketIo(server, {
     cors: {
         origin: "*",
@@ -12,31 +15,73 @@ const io = socketIo(server, {
     },
     pingTimeout: 60000,
     pingInterval: 25000,
-    transports: ['websocket', 'polling']
+    transports: ['websocket', 'polling'],
+    allowUpgrades: true,
+    perMessageDeflate: {
+        threshold: 1024,
+        concurrencyLimit: 10,
+        zlibDeflateOptions: {
+            chunkSize: 16 * 1024
+        }
+    },
+    maxHttpBufferSize: 1e8,
+    serveClient: false,
+    connectionStateRecovery: {
+        maxDisconnectionDuration: 2 * 60 * 1000, // 2 minutes
+        skipMiddlewares: true
+    }
 });
 
-// Serve static files
-app.use(express.static(path.join(__dirname)));
+// Serve static files with cache control
+app.use(express.static(path.join(__dirname), {
+    maxAge: '1d',
+    etag: true,
+    lastModified: true,
+    setHeaders: (res, path) => {
+        if (path.endsWith('.html')) {
+            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        }
+    }
+}));
 
 // Serve index.html for root route
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// Health check endpoint
+// Enhanced health check endpoint
 app.get('/health', (req, res) => {
-    res.json({ status: 'OK', timestamp: new Date().toISOString() });
+    const healthData = {
+        status: 'OK',
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+        memoryUsage: process.memoryUsage(),
+        gamesCount: games.size,
+        playersCount: playerRooms.size,
+        loadAvg: process.cpuUsage()
+    };
+    res.json(healthData);
 });
 
-// Game state storage
-const games = new Map();
-const playerRooms = new Map(); // Track which room each player is in
+// Add keep-alive endpoint
+app.get('/keepalive', (req, res) => {
+    res.status(204).end();
+});
 
-// Helper functions
+// Game state storage with enhanced data structure
+const games = new Map();
+const playerRooms = new Map();
+const playerSockets = new Map(); // Track socket instances for each player
+
+// Helper functions with additional validation
 function generateRoomCode() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Avoid ambiguous characters
     let code;
     do {
-        code = Math.random().toString(36).substring(2, 8).toUpperCase();
+        code = '';
+        for (let i = 0; i < 6; i++) {
+            code += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
     } while (games.has(code));
     return code;
 }
@@ -56,128 +101,141 @@ function createNewGame(roomCode, firstPlayer) {
         currentTurn: 0,
         status: 'waiting',
         createdAt: Date.now(),
-        lastActivity: Date.now()
+        lastActivity: Date.now(),
+        reconnectionTokens: new Map() // Store tokens for reconnecting players
     };
 }
 
+// Enhanced move validation
 function isValidMove(game, playerId, newPosition) {
-    const player = game.players[playerId];
-    if (!player) return false;
-    
-    const currentPos = player.position;
-
-    // Check bounds
-    if (newPosition.x < 0 || newPosition.x > 8 || newPosition.y < 0 || newPosition.y > 8) {
-        return false;
-    }
-
-    // Check if target is occupied
-    const isOccupied = game.players.some(p => 
-        p.position.x === newPosition.x && p.position.y === newPosition.y
-    );
-    if (isOccupied) return false;
-
-    const dx = Math.abs(newPosition.x - currentPos.x);
-    const dy = Math.abs(newPosition.y - currentPos.y);
-
-    // Adjacent move
-    if ((dx === 1 && dy === 0) || (dx === 0 && dy === 1)) {
-        return !isWallBetween(game.board, currentPos, newPosition);
-    }
-
-    // Jump move
-    if ((dx === 2 && dy === 0) || (dx === 0 && dy === 2)) {
-        const midPoint = {
-            x: currentPos.x + (newPosition.x - currentPos.x) / 2,
-            y: currentPos.y + (newPosition.y - currentPos.y) / 2
-        };
+    try {
+        const player = game.players[playerId];
+        if (!player) return false;
         
-        // Check if opponent is at midpoint
-        const opponentAtMid = game.players.some(p => 
-            p.position.x === midPoint.x && p.position.y === midPoint.y
-        );
-        if (!opponentAtMid) return false;
-        
-        return !isWallBetween(game.board, currentPos, midPoint) && 
-               !isWallBetween(game.board, midPoint, newPosition);
-    }
+        const currentPos = player.position;
 
-    // Diagonal jump
-    if (dx === 1 && dy === 1) {
-        // Find adjacent opponent
-        const directions = [
-            { x: 0, y: 1 }, { x: 0, y: -1 }, { x: 1, y: 0 }, { x: -1, y: 0 }
-        ];
-        
-        let opponentPos = null;
-        for (let dir of directions) {
-            const checkPos = { x: currentPos.x + dir.x, y: currentPos.y + dir.y };
-            const opponent = game.players.find(p => 
-                p.position.x === checkPos.x && p.position.y === checkPos.y
-            );
-            if (opponent) {
-                opponentPos = checkPos;
-                break;
-            }
-        }
-        
-        if (!opponentPos) return false;
-        
-        // Check if straight jump is blocked
-        const straightJump = {
-            x: currentPos.x + (opponentPos.x - currentPos.x) * 2,
-            y: currentPos.y + (opponentPos.y - currentPos.y) * 2
-        };
-        
-        if (straightJump.x >= 0 && straightJump.x <= 8 && 
-            straightJump.y >= 0 && straightJump.y <= 8) {
-            const straightBlocked = game.players.some(p => 
-                p.position.x === straightJump.x && p.position.y === straightJump.y
-            ) || isWallBetween(game.board, opponentPos, straightJump);
-            
-            if (!straightBlocked) return false; // Must use straight jump if available
-        }
-        
-        return !isWallBetween(game.board, currentPos, opponentPos) && 
-               !isWallBetween(game.board, opponentPos, newPosition);
-    }
-
-    return false;
-}
-
-function isValidWallPlacement(game, playerId, wall) {
-    const player = game.players[playerId];
-    if (!player || player.walls <= 0) return false;
-
-    const { x, y, orientation } = wall;
-
-    // Check bounds
-    if (orientation === 'horizontal') {
-        if (x < 0 || x > 7 || y < 1 || y > 8) return false;
-        if (game.board.horizontalWalls[x][y] || game.board.horizontalWalls[x + 1][y]) return false;
-    } else {
-        if (x < 1 || x > 8 || y < 0 || y > 7) return false;
-        if (game.board.verticalWalls[x][y] || game.board.verticalWalls[x][y + 1]) return false;
-    }
-
-    // Check intersections
-    if (orientation === 'horizontal' && y > 0 && y < 8) {
-        if (game.board.verticalWalls[x + 1][y - 1] && game.board.verticalWalls[x + 1][y]) return false;
-    } else if (orientation === 'vertical' && x > 0 && x < 8) {
-        if (game.board.horizontalWalls[x - 1][y + 1] && game.board.horizontalWalls[x][y + 1]) return false;
-    }
-
-    // Check if wall blocks all paths
-    const tempBoard = JSON.parse(JSON.stringify(game.board));
-    placeWallOnBoard(tempBoard, wall);
-    
-    for (let i = 0; i < game.players.length; i++) {
-        if (!hasPathToGoal(tempBoard, game.players[i].position, i)) {
+        // Check bounds
+        if (newPosition.x < 0 || newPosition.x > 8 || newPosition.y < 0 || newPosition.y > 8) {
             return false;
         }
-    }
 
-    return true;
+        // Check if target is occupied
+        const isOccupied = game.players.some(p => 
+            p.position.x === newPosition.x && p.position.y === newPosition.y
+        );
+        if (isOccupied) return false;
+
+        const dx = Math.abs(newPosition.x - currentPos.x);
+        const dy = Math.abs(newPosition.y - currentPos.y);
+
+        // Adjacent move
+        if ((dx === 1 && dy === 0) || (dx === 0 && dy === 1)) {
+            return !isWallBetween(game.board, currentPos, newPosition);
+        }
+
+        // Jump move
+        if ((dx === 2 && dy === 0) || (dx === 0 && dy === 2)) {
+            const midPoint = {
+                x: currentPos.x + (newPosition.x - currentPos.x) / 2,
+                y: currentPos.y + (newPosition.y - currentPos.y) / 2
+            };
+            
+            // Check if opponent is at midpoint
+            const opponentAtMid = game.players.some(p => 
+                p.position.x === midPoint.x && p.position.y === midPoint.y
+            );
+            if (!opponentAtMid) return false;
+            
+            return !isWallBetween(game.board, currentPos, midPoint) && 
+                   !isWallBetween(game.board, midPoint, newPosition);
+        }
+
+        // Diagonal jump
+        if (dx === 1 && dy === 1) {
+            // Find adjacent opponent
+            const directions = [
+                { x: 0, y: 1 }, { x: 0, y: -1 }, { x: 1, y: 0 }, { x: -1, y: 0 }
+            ];
+            
+            let opponentPos = null;
+            for (let dir of directions) {
+                const checkPos = { x: currentPos.x + dir.x, y: currentPos.y + dir.y };
+                const opponent = game.players.find(p => 
+                    p.position.x === checkPos.x && p.position.y === checkPos.y
+                );
+                if (opponent) {
+                    opponentPos = checkPos;
+                    break;
+                }
+            }
+            
+            if (!opponentPos) return false;
+            
+            // Check if straight jump is blocked
+            const straightJump = {
+                x: currentPos.x + (opponentPos.x - currentPos.x) * 2,
+                y: currentPos.y + (opponentPos.y - currentPos.y) * 2
+            };
+            
+            if (straightJump.x >= 0 && straightJump.x <= 8 && 
+                straightJump.y >= 0 && straightJump.y <= 8) {
+                const straightBlocked = game.players.some(p => 
+                    p.position.x === straightJump.x && p.position.y === straightJump.y
+                ) || isWallBetween(game.board, opponentPos, straightJump);
+                
+                if (!straightBlocked) return false; // Must use straight jump if available
+            }
+            
+            return !isWallBetween(game.board, currentPos, opponentPos) && 
+                   !isWallBetween(game.board, opponentPos, newPosition);
+        }
+
+        return false;
+    } catch (error) {
+        console.error('Error in isValidMove:', error);
+        return false;
+    }
+}
+
+// Enhanced wall placement validation
+function isValidWallPlacement(game, playerId, wall) {
+    try {
+        const player = game.players[playerId];
+        if (!player || player.walls <= 0) return false;
+
+        const { x, y, orientation } = wall;
+
+        // Check bounds
+        if (orientation === 'horizontal') {
+            if (x < 0 || x > 7 || y < 1 || y > 8) return false;
+            if (game.board.horizontalWalls[x][y] || game.board.horizontalWalls[x + 1][y]) return false;
+        } else {
+            if (x < 1 || x > 8 || y < 0 || y > 7) return false;
+            if (game.board.verticalWalls[x][y] || game.board.verticalWalls[x][y + 1]) return false;
+        }
+
+        // Check intersections
+        if (orientation === 'horizontal' && y > 0 && y < 8) {
+            if (game.board.verticalWalls[x + 1][y - 1] && game.board.verticalWalls[x + 1][y]) return false;
+        } else if (orientation === 'vertical' && x > 0 && x < 8) {
+            if (game.board.horizontalWalls[x - 1][y + 1] && game.board.horizontalWalls[x][y + 1]) return false;
+        }
+
+        // Check if wall blocks all paths
+        const tempBoard = JSON.parse(JSON.stringify(game.board));
+        placeWallOnBoard(tempBoard, wall);
+        
+        for (let i = 0; i < game.players.length; i++) {
+            if (!hasPathToGoal(tempBoard, game.players[i].position, i)) {
+                return false;
+            }
+        }
+
+        return true;
+    } catch (error) {
+        console.error('Error in isValidWallPlacement:', error);
+        return false;
+    }
 }
 
 function placeWallOnBoard(board, wall) {
@@ -185,10 +243,10 @@ function placeWallOnBoard(board, wall) {
     
     if (orientation === 'horizontal') {
         board.horizontalWalls[x][y] = true;
-        board.horizontalWalls[x + 1][y] = true;
+        if (x + 1 <= 7) board.horizontalWalls[x + 1][y] = true;
     } else {
         board.verticalWalls[x][y] = true;
-        board.verticalWalls[x][y + 1] = true;
+        if (y + 1 <= 7) board.verticalWalls[x][y + 1] = true;
     }
 }
 
@@ -207,7 +265,14 @@ function isWallBetween(board, pos1, pos2) {
     return false;
 }
 
+// Enhanced pathfinding with memoization
+const pathCache = new Map();
 function hasPathToGoal(board, position, playerId) {
+    const cacheKey = `${JSON.stringify(board)}-${position.x},${position.y}-${playerId}`;
+    if (pathCache.has(cacheKey)) {
+        return pathCache.get(cacheKey);
+    }
+
     const visited = Array(9).fill().map(() => Array(9).fill(false));
     const queue = [position];
     visited[position.x][position.y] = true;
@@ -217,7 +282,10 @@ function hasPathToGoal(board, position, playerId) {
     while (queue.length > 0) {
         const pos = queue.shift();
 
-        if (pos.y === goalY) return true;
+        if (pos.y === goalY) {
+            pathCache.set(cacheKey, true);
+            return true;
+        }
 
         const directions = [
             { x: 0, y: 1 }, { x: 0, y: -1 },
@@ -236,6 +304,7 @@ function hasPathToGoal(board, position, playerId) {
         }
     }
 
+    pathCache.set(cacheKey, false);
     return false;
 }
 
@@ -251,9 +320,16 @@ function updateGameActivity(roomCode) {
     const game = games.get(roomCode);
     if (game) {
         game.lastActivity = Date.now();
+        // Clear path cache when game state changes
+        pathCache.clear();
     }
 }
 
+function generateReconnectionToken() {
+    return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+}
+
+// Enhanced player cleanup with reconnection support
 function cleanupPlayer(socketId) {
     const roomCode = playerRooms.get(socketId);
     if (roomCode) {
@@ -263,17 +339,41 @@ function cleanupPlayer(socketId) {
             
             if (playerIndex !== -1) {
                 if (game.status === 'playing') {
-                    // Notify other players
-                    io.to(roomCode).emit('playerLeft', { playerId: playerIndex });
-                    game.status = 'abandoned';
+                    // Generate reconnection token
+                    const token = generateReconnectionToken();
+                    game.reconnectionTokens.set(socketId, {
+                        token,
+                        expires: Date.now() + 120000 // 2 minutes
+                    });
                     
-                    // Keep the game for a short while in case player reconnects
+                    // Notify other players
+                    io.to(roomCode).emit('playerDisconnected', { 
+                        playerId: playerIndex,
+                        reconnectionTimeout: 120000
+                    });
+                    
+                    // Set temporary status
+                    game.status = 'paused';
+                    
+                    // Set timeout for full cleanup
                     setTimeout(() => {
-                        if (games.has(roomCode) && games.get(roomCode).status === 'abandoned') {
-                            games.delete(roomCode);
-                            console.log(`Cleaned up abandoned game: ${roomCode}`);
+                        if (games.has(roomCode)) {
+                            const currentGame = games.get(roomCode);
+                            if (currentGame.status === 'paused' && 
+                                currentGame.players[playerIndex].id === socketId) {
+                                currentGame.status = 'abandoned';
+                                io.to(roomCode).emit('playerLeft', { playerId: playerIndex });
+                                
+                                // Final cleanup after additional delay
+                                setTimeout(() => {
+                                    if (games.has(roomCode) {
+                                        games.delete(roomCode);
+                                        console.log(`Cleaned up abandoned game: ${roomCode}`);
+                                    }
+                                }, 30000);
+                            }
                         }
-                    }, 30000); // 30 seconds
+                    }, 120000);
                 } else if (game.status === 'waiting') {
                     // Remove waiting game immediately
                     games.delete(roomCode);
@@ -282,12 +382,68 @@ function cleanupPlayer(socketId) {
             }
         }
         playerRooms.delete(socketId);
+        playerSockets.delete(socketId);
     }
 }
 
-// Socket.io connection handling
+// Socket.io connection handling with enhanced features
 io.on('connection', (socket) => {
     console.log('New client connected:', socket.id);
+    playerSockets.set(socket.id, socket);
+
+    // Handle reconnection attempts
+    socket.on('restoreSession', (data) => {
+        try {
+            const { roomCode, playerId, token } = data;
+            const game = games.get(roomCode);
+            
+            if (!game || game.status !== 'paused') {
+                socket.emit('restoreFailed', { message: 'Game not available for restoration' });
+                return;
+            }
+            
+            const playerData = game.players[playerId];
+            if (!playerData || playerData.id !== socket.id) {
+                socket.emit('restoreFailed', { message: 'Invalid player data' });
+                return;
+            }
+            
+            const storedToken = game.reconnectionTokens.get(socket.id);
+            if (!storedToken || storedToken.token !== token || storedToken.expires < Date.now()) {
+                socket.emit('restoreFailed', { message: 'Invalid or expired token' });
+                return;
+            }
+            
+            // Successful reconnection
+            game.reconnectionTokens.delete(socket.id);
+            game.status = 'playing';
+            playerRooms.set(socket.id, roomCode);
+            socket.join(roomCode);
+            
+            const gameData = {
+                players: game.players.map(p => ({ 
+                    name: p.name, 
+                    position: p.position, 
+                    walls: p.walls 
+                })),
+                board: game.board,
+                currentTurn: game.currentTurn
+            };
+            
+            socket.emit('sessionRestored', { 
+                gameData,
+                playerId,
+                message: 'Successfully reconnected to game'
+            });
+            
+            io.to(roomCode).emit('playerReconnected', { playerId });
+            console.log(`Player reconnected: ${socket.id} to game ${roomCode}`);
+            
+        } catch (error) {
+            console.error('Error in restoreSession:', error);
+            socket.emit('restoreFailed', { message: 'Failed to restore session' });
+        }
+    });
 
     socket.on('joinRoom', (data) => {
         try {
@@ -310,7 +466,8 @@ io.on('connection', (socket) => {
                     id: socket.id,
                     name: playerName,
                     position: { x: 4, y: 0 },
-                    walls: 10
+                    walls: 10,
+                    lastPing: Date.now()
                 };
                 
                 game = createNewGame(roomCode, newPlayer);
@@ -318,7 +475,11 @@ io.on('connection', (socket) => {
                 
                 socket.join(roomCode);
                 playerRooms.set(socket.id, roomCode);
-                socket.emit('roomJoined', { roomCode, playerId: 0 });
+                socket.emit('roomJoined', { 
+                    roomCode, 
+                    playerId: 0,
+                    reconnectionToken: generateReconnectionToken()
+                });
                 
                 console.log(`Room created: ${roomCode} by ${socket.id}`);
             } else if (game.players.length === 1 && game.status === 'waiting') {
@@ -327,13 +488,18 @@ io.on('connection', (socket) => {
                     id: socket.id,
                     name: playerName,
                     position: { x: 4, y: 8 },
-                    walls: 10
+                    walls: 10,
+                    lastPing: Date.now()
                 };
                 
                 game.players.push(newPlayer);
                 socket.join(roomCode);
                 playerRooms.set(socket.id, roomCode);
-                socket.emit('roomJoined', { roomCode, playerId: 1 });
+                socket.emit('roomJoined', { 
+                    roomCode, 
+                    playerId: 1,
+                    reconnectionToken: generateReconnectionToken()
+                });
 
                 // Start the game
                 game.status = 'playing';
@@ -382,6 +548,7 @@ io.on('connection', (socket) => {
 
             // Execute move
             game.players[playerId].position = position;
+            game.players[playerId].lastPing = Date.now();
             updateGameActivity(roomCode);
 
             // Check win condition
@@ -392,9 +559,11 @@ io.on('connection', (socket) => {
                 
                 // Clean up finished game after a delay
                 setTimeout(() => {
-                    games.delete(roomCode);
-                    console.log(`Cleaned up finished game: ${roomCode}`);
-                }, 60000); // 1 minute
+                    if (games.has(roomCode)) {
+                        games.delete(roomCode);
+                        console.log(`Cleaned up finished game: ${roomCode}`);
+                    }
+                }, 60000);
             } else {
                 // Next turn
                 game.currentTurn = (game.currentTurn + 1) % 2;
@@ -439,6 +608,7 @@ io.on('connection', (socket) => {
             // Place wall
             placeWallOnBoard(game.board, wall);
             game.players[playerId].walls--;
+            game.players[playerId].lastPing = Date.now();
             updateGameActivity(roomCode);
 
             // Next turn
@@ -460,6 +630,21 @@ io.on('connection', (socket) => {
         }
     });
 
+    // Ping handler for connection health monitoring
+    socket.on('ping', () => {
+        const roomCode = playerRooms.get(socket.id);
+        if (roomCode) {
+            const game = games.get(roomCode);
+            if (game) {
+                const player = game.players.find(p => p.id === socket.id);
+                if (player) {
+                    player.lastPing = Date.now();
+                }
+            }
+        }
+        socket.emit('pong');
+    });
+
     socket.on('disconnect', (reason) => {
         console.log('Client disconnected:', socket.id, 'Reason:', reason);
         cleanupPlayer(socket.id);
@@ -470,12 +655,38 @@ io.on('connection', (socket) => {
     });
 });
 
-// Clean up old games periodically
+// Enhanced game cleanup with ping checks
 setInterval(() => {
     const now = Date.now();
     const GAME_TIMEOUT = 30 * 60 * 1000; // 30 minutes
     const WAITING_TIMEOUT = 10 * 60 * 1000; // 10 minutes for waiting games
+    const PING_TIMEOUT = 30000; // 30 seconds
     
+    // Clean up expired reconnection tokens
+    for (const [roomCode, game] of games.entries()) {
+        for (const [playerId, tokenData] of game.reconnectionTokens.entries()) {
+            if (tokenData.expires < now) {
+                game.reconnectionTokens.delete(playerId);
+            }
+        }
+    }
+    
+    // Check for inactive players in active games
+    for (const [roomCode, game] of games.entries()) {
+        if (game.status === 'playing') {
+            for (const player of game.players) {
+                if (player.lastPing && (now - player.lastPing) > PING_TIMEOUT) {
+                    const socket = playerSockets.get(player.id);
+                    if (socket) {
+                        socket.disconnect(true);
+                        console.log(`Disconnected inactive player: ${player.id}`);
+                    }
+                }
+            }
+        }
+    }
+    
+    // Clean up old games
     for (const [roomCode, game] of games.entries()) {
         const timeSinceActivity = now - game.lastActivity;
         const timeSinceCreation = now - game.createdAt;
@@ -490,12 +701,18 @@ setInterval(() => {
             shouldDelete = timeSinceActivity > GAME_TIMEOUT;
         } else if (game.status === 'finished') {
             shouldDelete = timeSinceActivity > 60000; // 1 minute for finished games
+        } else if (game.status === 'paused') {
+            // Check if all reconnection tokens are expired
+            const allTokensExpired = Array.from(game.reconnectionTokens.values())
+                .every(token => token.expires < now);
+            shouldDelete = allTokensExpired && timeSinceActivity > 120000; // 2 minutes
         }
         
         if (shouldDelete) {
             // Clean up player room mappings
             game.players.forEach(player => {
                 playerRooms.delete(player.id);
+                playerSockets.delete(player.id);
             });
             
             games.delete(roomCode);
@@ -504,37 +721,62 @@ setInterval(() => {
     }
     
     console.log(`Active games: ${games.size}, Active player mappings: ${playerRooms.size}`);
-}, 60000); // Check every minute
+}, 30000); // Check every 30 seconds
 
-// Graceful shutdown
-process.on('SIGTERM', () => {
-    console.log('SIGTERM received, shutting down gracefully');
-    server.close(() => {
-        console.log('Server closed');
-        process.exit(0);
+// Enhanced server keep-alive mechanism
+setInterval(() => {
+    // This helps prevent the server from being closed due to inactivity
+    console.log('Keep-alive ping');
+}, 300000); // Every 5 minutes
+
+// Graceful shutdown with enhanced cleanup
+function gracefulShutdown() {
+    console.log('Shutdown signal received, initiating graceful shutdown');
+    
+    // Notify all clients
+    io.emit('serverMaintenance', { message: 'Server is restarting, please reconnect shortly' });
+    
+    // Disconnect all sockets
+    io.sockets.sockets.forEach(socket => {
+        socket.disconnect(true);
     });
-});
+    
+    // Close server after short delay
+    setTimeout(() => {
+        server.close(() => {
+            console.log('Server closed');
+            process.exit(0);
+        });
+    }, 5000);
+}
 
-process.on('SIGINT', () => {
-    console.log('SIGINT received, shutting down gracefully');
-    server.close(() => {
-        console.log('Server closed');
-        process.exit(0);
-    });
-});
+process.on('SIGTERM', gracefulShutdown);
+process.on('SIGINT', gracefulShutdown);
 
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-    console.log(`Quoridor server running on port ${PORT}`);
-    console.log(`Server URL: https://wall-chess.onrender.com`);
-    console.log(`Health check: https://wall-chess.onrender.com/health`);
-});
-
-// Handle uncaught exceptions
+// Enhanced error handling
 process.on('uncaughtException', (error) => {
     console.error('Uncaught Exception:', error);
+    // Don't exit for uncaught exceptions - keep the server running
 });
 
 process.on('unhandledRejection', (reason, promise) => {
     console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+// Start server with enhanced configuration
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, '0.0.0.0', () => {
+    console.log(`Quoridor server running on port ${PORT}`);
+    console.log(`Server URL: https://wall-chess.onrender.com`);
+    console.log(`Health check: https://wall-chess.onrender.com/health`);
+    
+    // Enable keep-alive for all connections
+    server.keepAliveTimeout = 60000; // 60 seconds
+    server.headersTimeout = 65000; // 65 seconds
+});
+
+// Prevent server from closing on connection errors
+server.on('clientError', (err, socket) => {
+    console.error('Client connection error:', err);
+    socket.end('HTTP/1.1 400 Bad Request\r\n\r\n');
 });
